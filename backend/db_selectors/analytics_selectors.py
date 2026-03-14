@@ -18,7 +18,7 @@ class AnalyticsSelectors:
         Compare multiple campaigns side by side.
         Returns scores and risk levels for each campaign.
         """
-        from selectors.dashboard_selectors import DashboardSelectors
+        from db_selectors.dashboard_selectors import DashboardSelectors
         from services.risk_service import RiskService
 
         risk_svc = RiskService()

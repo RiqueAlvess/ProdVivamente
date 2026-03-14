@@ -27,7 +27,7 @@ class RiskService:
         IGRP = Weighted average of dimension risk levels.
         Scale: 0-100 (0=no risk, 100=maximum risk).
         """
-        from selectors.dashboard_selectors import DashboardSelectors
+        from db_selectors.dashboard_selectors import DashboardSelectors
         scores = DashboardSelectors.get_dimensoes_scores(campaign, filters)
 
         if not scores:
@@ -58,7 +58,7 @@ class RiskService:
         Get count of dimensions in each risk level.
         Returns: {'baixo': N, 'moderado': N, 'alto': N, 'critico': N}
         """
-        from selectors.dashboard_selectors import DashboardSelectors
+        from db_selectors.dashboard_selectors import DashboardSelectors
         scores = DashboardSelectors.get_dimensoes_scores(campaign, filters)
 
         distribuicao = {'baixo': 0, 'moderado': 0, 'alto': 0, 'critico': 0}
@@ -75,7 +75,7 @@ class RiskService:
 
     def get_dimensoes_criticas(self, campaign, filters: dict = None, top_n: int = 3) -> list:
         """Get top N most critical dimensions."""
-        from selectors.dashboard_selectors import DashboardSelectors
+        from db_selectors.dashboard_selectors import DashboardSelectors
         scores = DashboardSelectors.get_dimensoes_scores(campaign, filters)
 
         dimensoes_com_nivel = []

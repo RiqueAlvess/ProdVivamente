@@ -209,7 +209,7 @@ def compute_dashboard_cache(campaign_id: int):
     """Pre-compute and cache dashboard data for fast access."""
     from django.core.cache import cache
     from apps.surveys.models import Campaign
-    from selectors.dashboard_selectors import DashboardSelectors
+    from db_selectors.dashboard_selectors import DashboardSelectors
     from services.risk_service import RiskService
 
     try:
