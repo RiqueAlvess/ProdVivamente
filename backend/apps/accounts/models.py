@@ -1,6 +1,7 @@
 """
 Accounts app models - UserProfile and AuditLog.
 NO registration endpoint - only admin creates users via Django admin.
+With django-tenants, UserProfile is schema-isolated per tenant.
 """
 from django.contrib.auth.models import User
 from django.db import models
@@ -14,7 +15,7 @@ class UserProfile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField(max_length=20, choices=ROLES, default='rh')
-    empresas = models.ManyToManyField('tenants.Empresa', blank=True, related_name='usuarios')
+    # No empresa FK — isolation is done by PostgreSQL schema (django-tenants)
     unidades_permitidas = models.ManyToManyField('structure.Unidade', blank=True)
     setores_permitidos = models.ManyToManyField('structure.Setor', blank=True)
     telefone = models.CharField(max_length=20, blank=True)
@@ -43,9 +44,7 @@ class AuditLog(models.Model):
     ]
 
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    empresa = models.ForeignKey(
-        'tenants.Empresa', on_delete=models.SET_NULL, null=True, blank=True
-    )
+    # No empresa FK — audit is per-schema (tenant-scoped)
     acao = models.CharField(max_length=50, choices=ACOES)
     descricao = models.TextField()
     ip = models.GenericIPAddressField(null=True, blank=True)
@@ -58,7 +57,7 @@ class AuditLog(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['user', 'created_at']),
-            models.Index(fields=['empresa', 'acao']),
+            models.Index(fields=['acao', 'created_at']),
         ]
 
     def __str__(self):

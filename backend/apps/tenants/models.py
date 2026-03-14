@@ -1,11 +1,13 @@
 """
-Tenants app models - Empresa (tenant/company).
+Tenants app models - Empresa (TenantMixin) and Domain (DomainMixin).
+Uses django-tenants for PostgreSQL schema-per-tenant isolation.
 """
 from django.db import models
 from django.utils.text import slugify
+from django_tenants.models import TenantMixin, DomainMixin
 
 
-class Empresa(models.Model):
+class Empresa(TenantMixin):
     nome = models.CharField(max_length=255)
     cnpj = models.CharField(max_length=18, unique=True)
     slug = models.SlugField(unique=True, blank=True)
@@ -21,6 +23,9 @@ class Empresa(models.Model):
     ativo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # TenantMixin: automatically creates the PostgreSQL schema on save
+    auto_create_schema = True
 
     class Meta:
         verbose_name = 'Empresa'
@@ -40,3 +45,15 @@ class Empresa(models.Model):
                 n += 1
             self.slug = slug
         super().save(*args, **kwargs)
+
+
+class Domain(DomainMixin):
+    """
+    Maps a domain/subdomain to an Empresa (tenant).
+    Example: empresa1.vivamente.com.br → Empresa(slug='empresa1')
+    DomainMixin provides: domain (CharField), tenant (FK → Empresa), is_primary (BooleanField).
+    """
+
+    class Meta:
+        verbose_name = 'Domínio'
+        verbose_name_plural = 'Domínios'

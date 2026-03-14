@@ -22,18 +22,21 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # ---------------------------------------------------------------------------
-# Application definition
+# Application definition — django-tenants schema-per-tenant
 # ---------------------------------------------------------------------------
-DJANGO_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
+
+# SHARED_APPS: live in the public schema (shared by all tenants)
+SHARED_APPS = [
+    'django_tenants',           # must be first
+    'apps.tenants',             # Empresa (TenantMixin) + Domain (DomainMixin)
+
     'django.contrib.contenttypes',
+    'django.contrib.auth',
+    'django.contrib.admin',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-]
 
-THIRD_PARTY_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -41,8 +44,8 @@ THIRD_PARTY_APPS = [
     'corsheaders',
 ]
 
-LOCAL_APPS = [
-    'apps.tenants',
+# TENANT_APPS: each tenant gets its own PostgreSQL schema with these tables
+TENANT_APPS = [
     'apps.accounts',
     'apps.structure',
     'apps.surveys',
@@ -53,9 +56,17 @@ LOCAL_APPS = [
     'apps.core',
 ]
 
-INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
+
+# django-tenants model references
+TENANT_MODEL = 'tenants.Empresa'
+TENANT_DOMAIN_MODEL = 'tenants.Domain'
+
+# Public schema URL conf (tenant management + admin)
+PUBLIC_SCHEMA_URLCONF = 'config.urls_public'
 
 MIDDLEWARE = [
+    'django_tenants.middleware.main.TenantMainMiddleware',  # must be first
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -102,7 +113,7 @@ if DATABASE_URL:
         db_params = match.groupdict()
         DATABASES = {
             'default': {
-                'ENGINE': 'django.db.backends.postgresql',
+                'ENGINE': 'django_tenants.postgresql_backend',  # required by django-tenants
                 'NAME': db_params['name'],
                 'USER': db_params['user'],
                 'PASSWORD': db_params['password'],
@@ -122,7 +133,7 @@ if DATABASE_URL:
 else:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.postgresql',
+            'ENGINE': 'django_tenants.postgresql_backend',  # required by django-tenants
             'NAME': os.environ.get('DB_NAME', 'vivamente'),
             'USER': os.environ.get('DB_USER', 'postgres'),
             'PASSWORD': os.environ.get('DB_PASSWORD', ''),
@@ -130,6 +141,8 @@ else:
             'PORT': os.environ.get('DB_PORT', '5432'),
         }
     }
+
+DATABASE_ROUTERS = ['django_tenants.routers.TenantSyncRouter']
 
 # ---------------------------------------------------------------------------
 # Password validation
