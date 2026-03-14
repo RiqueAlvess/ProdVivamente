@@ -28,19 +28,18 @@ class DimTempo(models.Model):
 
 class DimEstrutura(models.Model):
     """Organizational structure dimension."""
-    empresa = models.ForeignKey('tenants.Empresa', on_delete=models.CASCADE)
+    # No empresa FK — schema isolation handles tenant separation
     unidade = models.ForeignKey('structure.Unidade', on_delete=models.CASCADE)
     setor = models.ForeignKey('structure.Setor', on_delete=models.CASCADE)
-    empresa_nome = models.CharField(max_length=255)
     unidade_nome = models.CharField(max_length=255)
     setor_nome = models.CharField(max_length=255)
 
     class Meta:
         verbose_name = 'Dimensão Estrutura'
-        unique_together = ['empresa', 'unidade', 'setor']
+        unique_together = ['unidade', 'setor']
 
     def __str__(self):
-        return f'{self.empresa_nome} > {self.unidade_nome} > {self.setor_nome}'
+        return f'{self.unidade_nome} > {self.setor_nome}'
 
 
 class DimDemografia(models.Model):

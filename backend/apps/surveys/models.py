@@ -48,7 +48,7 @@ class Campaign(models.Model):
         ('closed', 'Encerrado'),
     ]
 
-    empresa = models.ForeignKey('tenants.Empresa', on_delete=models.CASCADE, related_name='campaigns')
+    # No empresa FK — schema isolation handles tenant separation
     nome = models.CharField(max_length=255)
     descricao = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
@@ -68,7 +68,7 @@ class Campaign(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'{self.nome} ({self.empresa.nome})'
+        return self.nome
 
     def encerrar(self):
         """
