@@ -26,7 +26,7 @@ class ExportService:
         from openpyxl.styles import Font, PatternFill, Alignment
         from openpyxl.utils import get_column_letter
 
-        from selectors.dashboard_selectors import DashboardSelectors
+        from db_selectors.dashboard_selectors import DashboardSelectors
         from services.score_service import TIPO_DIMENSAO
         from services.risk_service import RiskService
         from services.score_service import score_service
@@ -139,7 +139,7 @@ class ExportService:
         """Generate Word report."""
         from docx import Document
         from docx.shared import Pt, RGBColor
-        from selectors.dashboard_selectors import DashboardSelectors
+        from db_selectors.dashboard_selectors import DashboardSelectors
         from services.score_service import TIPO_DIMENSAO
         from services.risk_service import RiskService
         from services.score_service import score_service

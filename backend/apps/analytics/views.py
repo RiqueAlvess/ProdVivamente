@@ -45,7 +45,7 @@ class DashboardView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        from selectors.dashboard_selectors import DashboardSelectors
+        from db_selectors.dashboard_selectors import DashboardSelectors
         from services.risk_service import RiskService
 
         campaign_id = request.query_params.get('campaign')
@@ -124,7 +124,7 @@ class CampaignComparisonView(APIView):
         except ValueError:
             return Response({'error': 'IDs de campanha inválidos.'}, status=400)
 
-        from selectors.analytics_selectors import AnalyticsSelectors
+        from db_selectors.analytics_selectors import AnalyticsSelectors
         empresas = get_user_empresas(request.user)
         campaigns = Campaign.objects.filter(pk__in=campaign_ids, empresa__in=empresas)
 
