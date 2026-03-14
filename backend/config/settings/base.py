@@ -42,6 +42,7 @@ SHARED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'drf_spectacular',
     'corsheaders',
+    'django_celery_beat',
 ]
 
 # TENANT_APPS: each tenant gets its own PostgreSQL schema with these tables
