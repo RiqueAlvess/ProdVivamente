@@ -4,7 +4,7 @@ Served for every authenticated tenant schema request.
 """
 from django.contrib import admin
 from django.urls import include, path
-from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerUIView
+from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView as SpectacularSwaggerUIView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
