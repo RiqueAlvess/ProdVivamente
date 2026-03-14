@@ -24,9 +24,9 @@ class PerguntaAdmin(admin.ModelAdmin):
 
 @admin.register(Campaign)
 class CampaignAdmin(admin.ModelAdmin):
-    list_display = ['nome', 'empresa', 'status', 'data_inicio', 'data_fim', 'taxa_adesao', 'created_at']
-    list_filter = ['status', 'empresa']
-    search_fields = ['nome', 'empresa__nome']
+    list_display = ['nome', 'status', 'data_inicio', 'data_fim', 'taxa_adesao', 'created_at']
+    list_filter = ['status']
+    search_fields = ['nome']
     readonly_fields = ['created_at', 'updated_at', 'closed_at']
     date_hierarchy = 'created_at'
     actions = ['activar_campanhas', 'encerrar_campanhas']

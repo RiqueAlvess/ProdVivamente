@@ -8,9 +8,9 @@ from .models import (
 
 @admin.register(DimEstrutura)
 class DimEstruturaAdmin(admin.ModelAdmin):
-    list_display = ['empresa_nome', 'unidade_nome', 'setor_nome']
-    list_filter = ['empresa']
-    search_fields = ['empresa_nome', 'unidade_nome', 'setor_nome']
+    list_display = ['unidade_nome', 'setor_nome']
+    list_filter = ['unidade']
+    search_fields = ['unidade_nome', 'setor_nome']
 
 
 @admin.register(FactScoreDimensao)

@@ -9,7 +9,7 @@ class UserProfileInline(admin.StackedInline):
     model = UserProfile
     can_delete = False
     verbose_name_plural = 'Perfil'
-    filter_horizontal = ['empresas', 'unidades_permitidas', 'setores_permitidos']
+    filter_horizontal = ['unidades_permitidas', 'setores_permitidos']
     extra = 1
 
 
@@ -32,22 +32,18 @@ admin.site.register(User, CustomUserAdmin)
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ['user', 'role', 'get_empresas', 'telefone', 'created_at']
+    list_display = ['user', 'role', 'telefone', 'created_at']
     list_filter = ['role']
     search_fields = ['user__username', 'user__email']
-    filter_horizontal = ['empresas', 'unidades_permitidas', 'setores_permitidos']
-
-    def get_empresas(self, obj):
-        return ', '.join(obj.empresas.values_list('nome', flat=True))
-    get_empresas.short_description = 'Empresas'
+    filter_horizontal = ['unidades_permitidas', 'setores_permitidos']
 
 
 @admin.register(AuditLog)
 class AuditLogAdmin(admin.ModelAdmin):
-    list_display = ['user', 'empresa', 'acao', 'ip', 'created_at']
-    list_filter = ['acao', 'created_at', 'empresa']
+    list_display = ['user', 'acao', 'ip', 'created_at']
+    list_filter = ['acao', 'created_at']
     search_fields = ['user__username', 'descricao', 'ip']
-    readonly_fields = ['user', 'empresa', 'acao', 'descricao', 'ip', 'user_agent', 'created_at']
+    readonly_fields = ['user', 'acao', 'descricao', 'ip', 'user_agent', 'created_at']
     date_hierarchy = 'created_at'
 
     def has_add_permission(self, request):

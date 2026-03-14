@@ -9,9 +9,9 @@ class SetorInline(admin.TabularInline):
 
 @admin.register(Unidade)
 class UnidadeAdmin(admin.ModelAdmin):
-    list_display = ['nome', 'empresa', 'get_setor_count', 'created_at']
-    list_filter = ['empresa']
-    search_fields = ['nome', 'empresa__nome']
+    list_display = ['nome', 'get_setor_count', 'created_at']
+    list_filter = []
+    search_fields = ['nome']
     inlines = [SetorInline]
 
     def get_setor_count(self, obj):
@@ -21,17 +21,13 @@ class UnidadeAdmin(admin.ModelAdmin):
 
 @admin.register(Setor)
 class SetorAdmin(admin.ModelAdmin):
-    list_display = ['nome', 'unidade', 'get_empresa', 'created_at']
-    list_filter = ['unidade__empresa']
-    search_fields = ['nome', 'unidade__nome', 'unidade__empresa__nome']
-
-    def get_empresa(self, obj):
-        return obj.unidade.empresa.nome
-    get_empresa.short_description = 'Empresa'
+    list_display = ['nome', 'unidade', 'created_at']
+    list_filter = ['unidade']
+    search_fields = ['nome', 'unidade__nome']
 
 
 @admin.register(Cargo)
 class CargoAdmin(admin.ModelAdmin):
-    list_display = ['nome', 'empresa', 'created_at']
-    list_filter = ['empresa']
-    search_fields = ['nome', 'empresa__nome']
+    list_display = ['nome', 'created_at']
+    list_filter = []
+    search_fields = ['nome']
