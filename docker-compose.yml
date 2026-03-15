@@ -30,6 +30,7 @@ services:
         condition: service_healthy
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.development
+      - REDIS_URL=redis://redis:6379/0
 
   celery_worker:
     build:
@@ -46,6 +47,7 @@ services:
         condition: service_healthy
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.development
+      - REDIS_URL=redis://redis:6379/0
 
   celery_beat:
     build:
@@ -61,6 +63,7 @@ services:
         condition: service_healthy
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.development
+      - REDIS_URL=redis://redis:6379/0
 
   frontend:
     build:
