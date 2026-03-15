@@ -3,6 +3,8 @@ import string
 
 from django.contrib import admin, messages
 from django.contrib.auth.models import User
+from django.core.management import call_command
+from django.db import ProgrammingError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
 from django.utils.html import format_html
@@ -10,6 +12,11 @@ from django_tenants.admin import TenantAdminMixin
 from django_tenants.utils import tenant_context
 
 from .models import Domain, Empresa
+
+
+def _run_tenant_migrations(empresa):
+    """Run pending migrations for a specific tenant schema."""
+    call_command('migrate_schemas', schema=empresa.schema_name, verbosity=0)
 
 
 def _generate_password(length=12):
@@ -57,7 +64,7 @@ class EmpresaAdmin(TenantAdminMixin, admin.ModelAdmin):
     search_fields = ['nome', 'cnpj', 'schema_name', 'admin_email']
     prepopulated_fields = {'slug': ('nome',)}
     readonly_fields = ['created_at', 'updated_at']
-    actions = ['provisionar_admin', 'ativar_tenants', 'desativar_tenants']
+    actions = ['provisionar_admin', 'aplicar_migracoes', 'ativar_tenants', 'desativar_tenants']
 
     fieldsets = (
         ('Tenant', {
@@ -158,6 +165,23 @@ class EmpresaAdmin(TenantAdminMixin, admin.ModelAdmin):
 
         if erros:
             self.message_user(request, 'Erros: ' + ' | '.join(erros), level=messages.ERROR)
+
+    @admin.action(description='Aplicar migrações pendentes no schema do tenant')
+    def aplicar_migracoes(self, request, queryset):
+        for empresa in queryset:
+            try:
+                _run_tenant_migrations(empresa)
+                self.message_user(
+                    request,
+                    f'✓ Migrações aplicadas em "{empresa.nome}" (schema: {empresa.schema_name}).',
+                    level=messages.SUCCESS,
+                )
+            except Exception as e:
+                self.message_user(
+                    request,
+                    f'Erro ao migrar "{empresa.nome}": {e}',
+                    level=messages.ERROR,
+                )
 
     @admin.action(description='Ativar tenants selecionados')
     def ativar_tenants(self, request, queryset):
@@ -263,35 +287,30 @@ class EmpresaAdmin(TenantAdminMixin, admin.ModelAdmin):
                 messages.error(request, 'E-mail é obrigatório.')
             else:
                 try:
-                    with tenant_context(empresa):
-                        from apps.accounts.models import UserProfile
-
-                        if User.objects.filter(email=email).exists():
-                            messages.error(request, f'Já existe um usuário com o e-mail {email}.')
-                        else:
-                            base_username = email.split('@')[0]
-                            username = base_username
-                            n = 1
-                            while User.objects.filter(username=username).exists():
-                                username = f'{base_username}{n}'
-                                n += 1
-
-                            user = User.objects.create_user(
-                                username=username,
-                                email=email,
-                                password=password,
-                                first_name=first_name,
-                                last_name=last_name,
-                                is_staff=is_staff,
-                                is_active=True,
-                            )
-                            UserProfile.objects.create(user=user, role=role)
-
-                            messages.success(
-                                request,
-                                f'✓ Usuário {email} criado! Senha: {password} — Anote agora, não será exibida novamente.',
-                            )
-                            return redirect(lista_url)
+                    self._criar_usuario_no_tenant(
+                        empresa, email, password, first_name, last_name, role, is_staff
+                    )
+                    messages.success(
+                        request,
+                        f'✓ Usuário {email} criado! Senha: {password} — Anote agora, não será exibida novamente.',
+                    )
+                    return redirect(lista_url)
+                except ProgrammingError:
+                    # Schema exists but migrations haven't run yet — fix automatically.
+                    try:
+                        _run_tenant_migrations(empresa)
+                        self._criar_usuario_no_tenant(
+                            empresa, email, password, first_name, last_name, role, is_staff
+                        )
+                        messages.success(
+                            request,
+                            f'✓ Migrações aplicadas e usuário {email} criado! Senha: {password} — Anote agora.',
+                        )
+                        return redirect(lista_url)
+                    except Exception as e:
+                        messages.error(request, f'Erro mesmo após aplicar migrações: {e}')
+                except ValueError as e:
+                    messages.error(request, str(e))
                 except Exception as e:
                     messages.error(request, f'Erro ao criar usuário: {e}')
 
@@ -303,6 +322,32 @@ class EmpresaAdmin(TenantAdminMixin, admin.ModelAdmin):
             'opts': self.model._meta,
         }
         return render(request, 'admin/tenants/novo_usuario.html', context)
+
+    def _criar_usuario_no_tenant(self, empresa, email, password, first_name, last_name, role, is_staff):
+        """Create a user + UserProfile inside the tenant schema. Raises ValueError if email already exists."""
+        with tenant_context(empresa):
+            from apps.accounts.models import UserProfile
+
+            if User.objects.filter(email=email).exists():
+                raise ValueError(f'Já existe um usuário com o e-mail {email}.')
+
+            base_username = email.split('@')[0]
+            username = base_username
+            n = 1
+            while User.objects.filter(username=username).exists():
+                username = f'{base_username}{n}'
+                n += 1
+
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                is_staff=is_staff,
+                is_active=True,
+            )
+            UserProfile.objects.create(user=user, role=role)
 
     def resetar_senha_view(self, request, pk, user_id):
         empresa = get_object_or_404(Empresa, pk=pk)
