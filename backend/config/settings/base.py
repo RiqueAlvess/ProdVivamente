@@ -67,10 +67,10 @@ TENANT_DOMAIN_MODEL = 'tenants.Domain'
 PUBLIC_SCHEMA_URLCONF = 'config.urls_public'
 
 MIDDLEWARE = [
-    'django_tenants.middleware.main.TenantMainMiddleware',  # must be first
+    'corsheaders.middleware.CorsMiddleware',  # must be before TenantMainMiddleware to handle preflight
+    'django_tenants.middleware.main.TenantMainMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',

@@ -5,7 +5,7 @@ Handles tenant/domain management and public branding lookups.
 """
 from django.contrib import admin
 from django.urls import include, path
-from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerUIView
+from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView as SpectacularSwaggerUIView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
