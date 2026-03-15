@@ -18,6 +18,7 @@ from .models import AuditLog
 from .serializers import (
     CustomTokenObtainPairSerializer,
     UserSerializer,
+    CreateUserSerializer,
     ChangePasswordSerializer,
     AuditLogSerializer,
 )
@@ -61,13 +62,17 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         ip = get_client_ip(request)
         ua = get_user_agent(request)
 
-        AuditLog.objects.create(
-            user=user,
-            acao='login',
-            descricao=f'Login via JWT - {user.username}',
-            ip=ip,
-            user_agent=ua,
-        )
+        try:
+            AuditLog.objects.create(
+                user=user,
+                acao='login',
+                descricao=f'Login via JWT - {user.username}',
+                ip=ip,
+                user_agent=ua,
+            )
+        except Exception:
+            # AuditLog table only exists in tenant schemas, not in the public schema
+            pass
 
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
@@ -101,13 +106,16 @@ class LogoutView(APIView):
 
         user = request.user
 
-        AuditLog.objects.create(
-            user=user,
-            acao='logout',
-            descricao=f'Logout - {user.username}',
-            ip=get_client_ip(request),
-            user_agent=get_user_agent(request),
-        )
+        try:
+            AuditLog.objects.create(
+                user=user,
+                acao='logout',
+                descricao=f'Logout - {user.username}',
+                ip=get_client_ip(request),
+                user_agent=get_user_agent(request),
+            )
+        except Exception:
+            pass
 
         return Response({'detail': 'Logout realizado com sucesso.'}, status=status.HTTP_200_OK)
 
@@ -170,3 +178,47 @@ class AuditLogListView(generics.ListAPIView):
         if acao:
             qs = qs.filter(acao=acao)
         return qs
+
+
+class UserListCreateView(generics.ListCreateAPIView):
+    """
+    GET  /api/auth/users/  — List all users in the tenant (admin only)
+    POST /api/auth/users/  — Create a new user in the tenant (admin only)
+    """
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return User.objects.select_related('profile').filter(is_superuser=False).order_by('email')
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return CreateUserSerializer
+        return UserSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = CreateUserSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+
+
+class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    GET    /api/auth/users/<id>/  — Get user detail
+    PATCH  /api/auth/users/<id>/  — Update user info
+    DELETE /api/auth/users/<id>/  — Deactivate user (soft delete)
+    """
+    permission_classes = [permissions.IsAdminUser]
+    serializer_class = UserSerializer
+
+    def get_queryset(self):
+        return User.objects.select_related('profile').filter(is_superuser=False)
+
+    def perform_destroy(self, instance):
+        instance.is_active = False
+        instance.save()
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response({'detail': 'Usuário desativado.'}, status=status.HTTP_200_OK)

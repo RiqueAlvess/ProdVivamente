@@ -20,6 +20,7 @@ class Empresa(TenantMixin):
     cor_secundaria = models.CharField(max_length=7, default='#8B5CF6')
     cor_fonte = models.CharField(max_length=7, default='#1E293B')
     nome_app = models.CharField(max_length=100, default='VIVAMENTE 360º')
+    admin_email = models.EmailField(blank=True, verbose_name='E-mail do Admin RH')
     ativo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

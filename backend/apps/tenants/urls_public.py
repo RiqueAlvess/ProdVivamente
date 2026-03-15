@@ -7,6 +7,7 @@ from . import views
 
 urlpatterns = [
     path('', views.EmpresaListCreateView.as_view(), name='empresa-list'),
+    path('setup/', views.TenantSetupView.as_view(), name='tenant-setup'),
     path('<int:pk>/', views.EmpresaDetailView.as_view(), name='empresa-detail'),
     path('slug/<slug:slug>/', views.EmpresaBySlugView.as_view(), name='empresa-by-slug'),
     path('domains/', views.DomainListCreateView.as_view(), name='domain-list'),
