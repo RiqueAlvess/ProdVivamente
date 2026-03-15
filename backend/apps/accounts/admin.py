@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
+from django.db import ProgrammingError
 
 from .models import UserProfile, AuditLog
 
@@ -19,9 +20,10 @@ class CustomUserAdmin(UserAdmin):
     list_filter = ['is_staff', 'is_active', 'profile__role']
 
     def get_role(self, obj):
-        if hasattr(obj, 'profile'):
+        try:
             return obj.profile.get_role_display()
-        return '-'
+        except (UserProfile.DoesNotExist, ProgrammingError):
+            return '-'
     get_role.short_description = 'Papel'
 
 
