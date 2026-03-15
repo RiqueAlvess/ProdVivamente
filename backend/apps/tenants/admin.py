@@ -233,7 +233,7 @@ class EmpresaAdmin(TenantAdminMixin, admin.ModelAdmin):
                 profiles = {}
 
             for user in raw_users:
-                user._profile_obj = profiles.get(user.id)
+                user.profile_obj = profiles.get(user.id)
             users = raw_users
 
         context = {
