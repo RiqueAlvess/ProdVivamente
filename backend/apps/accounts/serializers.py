@@ -6,7 +6,6 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import UserProfile, AuditLog
-from apps.tenants.serializers import EmpresaPublicSerializer
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -24,8 +23,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['username'] = user.username
         token['email'] = user.email
         token['is_staff'] = user.is_staff
-        if hasattr(user, 'profile'):
+        try:
             token['role'] = user.profile.role
+        except Exception:
+            pass
         return token
 
     def validate(self, attrs):
@@ -48,25 +49,17 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'last_name': user.last_name,
             'is_staff': user.is_staff,
         }
-        if hasattr(user, 'profile'):
+        try:
             data['user']['role'] = user.profile.role
-            data['user']['empresas'] = list(
-                user.profile.empresas.values_list('id', flat=True)
-            )
+        except Exception:
+            pass
         return data
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    empresas = EmpresaPublicSerializer(many=True, read_only=True)
-    empresas_ids = serializers.PrimaryKeyRelatedField(
-        source='empresas',
-        many=True,
-        read_only=True,
-    )
-
     class Meta:
         model = UserProfile
-        fields = ['id', 'role', 'empresas', 'empresas_ids', 'telefone', 'created_at']
+        fields = ['id', 'role', 'telefone', 'created_at']
         read_only_fields = ['id', 'created_at']
 
 
@@ -88,12 +81,11 @@ class UserSerializer(serializers.ModelSerializer):
 
 class AuditLogSerializer(serializers.ModelSerializer):
     user_display = serializers.StringRelatedField(source='user')
-    empresa_display = serializers.StringRelatedField(source='empresa')
 
     class Meta:
         model = AuditLog
         fields = [
-            'id', 'user', 'user_display', 'empresa', 'empresa_display',
+            'id', 'user', 'user_display',
             'acao', 'descricao', 'ip', 'created_at',
         ]
         read_only_fields = fields

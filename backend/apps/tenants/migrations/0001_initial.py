@@ -1,0 +1,53 @@
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+
+    initial = True
+
+    dependencies = [
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='Empresa',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('schema_name', models.CharField(db_index=True, max_length=63, unique=True)),
+                ('nome', models.CharField(max_length=255)),
+                ('cnpj', models.CharField(max_length=18, unique=True)),
+                ('slug', models.SlugField(blank=True, unique=True)),
+                ('total_funcionarios', models.IntegerField(default=0)),
+                ('cnae', models.CharField(blank=True, max_length=10)),
+                ('cnae_descricao', models.CharField(blank=True, max_length=255)),
+                ('logo_url', models.URLField(blank=True)),
+                ('favicon_url', models.URLField(blank=True)),
+                ('cor_primaria', models.CharField(default='#0EA5E9', max_length=7)),
+                ('cor_secundaria', models.CharField(default='#8B5CF6', max_length=7)),
+                ('cor_fonte', models.CharField(default='#1E293B', max_length=7)),
+                ('nome_app', models.CharField(default='VIVAMENTE 360º', max_length=100)),
+                ('ativo', models.BooleanField(default=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+            ],
+            options={
+                'verbose_name': 'Empresa',
+                'verbose_name_plural': 'Empresas',
+                'ordering': ['nome'],
+            },
+        ),
+        migrations.CreateModel(
+            name='Domain',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('domain', models.CharField(db_index=True, max_length=253, unique=True)),
+                ('is_primary', models.BooleanField(db_index=True, default=True)),
+                ('tenant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='domains', to='tenants.empresa')),
+            ],
+            options={
+                'verbose_name': 'Domínio',
+                'verbose_name_plural': 'Domínios',
+            },
+        ),
+    ]
