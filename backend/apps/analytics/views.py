@@ -47,6 +47,7 @@ class DashboardView(APIView):
     def get(self, request):
         from db_selectors.dashboard_selectors import DashboardSelectors
         from services.risk_service import RiskService
+        from services.anonymity_service import AnonymityService
 
         campaign_id = request.query_params.get('campaign')
         if not campaign_id:
@@ -100,6 +101,7 @@ class DashboardView(APIView):
 
         return Response({
             'campaign': CampaignSerializer(campaign).data,
+            'data_released': AnonymityService.is_data_released(campaign),
             'metrics': metrics,
             'dimensoes_scores': dimensoes_scores,
             'distribuicao_riscos': distribuicao,

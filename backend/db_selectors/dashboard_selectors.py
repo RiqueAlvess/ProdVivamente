@@ -1,6 +1,6 @@
 """
 Dashboard selectors - query layer for dashboard data.
-Enforces K-anonymity on all segmented data.
+Data is only released after the campaign is finalized (status='closed').
 """
 import logging
 from typing import Dict, List, Optional
@@ -34,7 +34,10 @@ class DashboardSelectors:
 
     @staticmethod
     def get_dimensoes_scores(campaign, filters: dict = None) -> Dict[str, Optional[float]]:
-        """Calculate average scores per dimension."""
+        """Calculate average scores per dimension. Requires campaign to be finalized."""
+        if not AnonymityService.is_data_released(campaign):
+            return {dim: None for dim in DIMENSOES}
+
         responses = DashboardSelectors.get_responses(campaign, filters)
         if not responses.exists():
             return {dim: None for dim in DIMENSOES}
@@ -72,28 +75,27 @@ class DashboardSelectors:
     def get_scores_por_setor(campaign, filters: dict = None, top_n: int = 5) -> List[Dict]:
         """
         Top N critical sectors by average score.
-        Requires minimum 5 responses per sector (K-anonymity).
+        Only available after campaign is finalized.
         """
+        if not AnonymityService.is_data_released(campaign):
+            return []
+
         responses = DashboardSelectors.get_responses(campaign, filters)
         setores = responses.values_list('setor', flat=True).distinct()
 
         result = []
         for setor_id in setores:
             setor_responses = responses.filter(setor_id=setor_id)
-            ok, count = AnonymityService.check_minimum_sample_size(setor_responses)
-            if not ok:
-                continue
+            count = setor_responses.count()
 
             setor_filters = {**(filters or {}), 'setor_id': setor_id}
             scores = DashboardSelectors.get_dimensoes_scores(campaign, setor_filters)
 
-            # Calculate weighted average (considering dimension types)
             valid_scores = []
             for dim, sc in scores.items():
                 if sc is None:
                     continue
                 tipo = TIPO_DIMENSAO.get(dim, 'positivo')
-                # Normalize to 0-1 scale where 0=best, 1=worst for comparison
                 if tipo == 'negativo':
                     normalized = sc / 4.0
                 else:
@@ -123,7 +125,6 @@ class DashboardSelectors:
                 'scores': scores,
             })
 
-        # Sort by risk score descending (most at-risk first)
         result.sort(key=lambda x: x['score_risco_medio'], reverse=True)
         return result[:top_n]
 
@@ -131,23 +132,23 @@ class DashboardSelectors:
     def get_heatmap(campaign, filters: dict = None) -> List[Dict]:
         """
         Sector × Dimension heatmap data.
-        K-anonymity enforced - only sectors with >= 5 responses included.
+        Only available after campaign is finalized.
         """
+        if not AnonymityService.is_data_released(campaign):
+            return []
+
         responses = DashboardSelectors.get_responses(campaign, filters)
         setores = responses.values_list('setor__nome', 'setor_id').distinct()
 
         heatmap = []
         for setor_nome, setor_id in setores:
             setor_responses = responses.filter(setor_id=setor_id)
-            ok, count = AnonymityService.check_minimum_sample_size(setor_responses)
-            if not ok:
-                continue
+            count = setor_responses.count()
 
             scores = DashboardSelectors.get_dimensoes_scores(
                 campaign, {**(filters or {}), 'setor_id': setor_id}
             )
 
-            # Add risk levels
             scores_with_levels = {}
             for dim, sc in scores.items():
                 tipo = TIPO_DIMENSAO.get(dim, 'positivo')
@@ -170,9 +171,12 @@ class DashboardSelectors:
     @staticmethod
     def get_demographic_scores(campaign, filters: dict = None) -> Dict:
         """
-        Scores by demographics - K-anonymity enforced.
-        Only shows groups with >= 5 responses.
+        Scores by demographics.
+        Only available after campaign is finalized.
         """
+        if not AnonymityService.is_data_released(campaign):
+            return {field: [] for field in ['faixa_etaria', 'genero', 'tempo_empresa']}
+
         responses = DashboardSelectors.get_responses(campaign, filters)
 
         result = {}
