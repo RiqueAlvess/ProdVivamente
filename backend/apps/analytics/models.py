@@ -28,7 +28,6 @@ class DimTempo(models.Model):
 
 class DimEstrutura(models.Model):
     """Organizational structure dimension."""
-    # No empresa FK — schema isolation handles tenant separation
     unidade = models.ForeignKey('structure.Unidade', on_delete=models.CASCADE)
     setor = models.ForeignKey('structure.Setor', on_delete=models.CASCADE)
     unidade_nome = models.CharField(max_length=255)
