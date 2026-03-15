@@ -211,13 +211,30 @@ class EmpresaAdmin(TenantAdminMixin, admin.ModelAdmin):
     def usuarios_view(self, request, pk):
         empresa = get_object_or_404(Empresa, pk=pk)
 
+        from django.db import ProgrammingError
+
+        users = []
         with tenant_context(empresa):
             from apps.accounts.models import UserProfile
-            users = list(
-                User.objects.select_related('profile')
-                .filter(is_superuser=False)
-                .order_by('email')
+
+            # Fetch users and profiles in separate queries to avoid a
+            # cross-schema LEFT OUTER JOIN that fails on public schema context.
+            raw_users = list(
+                User.objects.filter(is_superuser=False).order_by('email')
             )
+            try:
+                profiles = {
+                    p.user_id: p
+                    for p in UserProfile.objects.filter(
+                        user_id__in=[u.id for u in raw_users]
+                    )
+                }
+            except ProgrammingError:
+                profiles = {}
+
+            for user in raw_users:
+                user._profile_obj = profiles.get(user.id)
+            users = raw_users
 
         context = {
             **self.admin_site.each_context(request),
