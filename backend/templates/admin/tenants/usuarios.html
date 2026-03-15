@@ -1,0 +1,128 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Início</a>
+  &rsaquo; <a href="{{ voltar_url }}">Empresas</a>
+  &rsaquo; {{ empresa.nome }}
+  &rsaquo; Usuários
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .usuario-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+  .usuario-table th { background: #417690; color: white; padding: 8px 12px; text-align: left; }
+  .usuario-table td { padding: 8px 12px; border-bottom: 1px solid #ddd; vertical-align: middle; }
+  .usuario-table tr:hover td { background: #f8f8f8; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+  .badge-rh { background: #d4edda; color: #155724; }
+  .badge-lideranca { background: #cce5ff; color: #004085; }
+  .badge-ativo { background: #d4edda; color: #155724; }
+  .badge-inativo { background: #f8d7da; color: #721c24; }
+  .badge-staff { background: #fff3cd; color: #856404; }
+  .btn-sm { padding: 3px 10px; font-size: 12px; cursor: pointer; border-radius: 3px; border: 1px solid #ccc; }
+  .btn-warning { background: #ffc107; border-color: #ffc107; color: #000; }
+  .btn-danger { background: #dc3545; border-color: #dc3545; color: white; }
+  .btn-success { background: #28a745; border-color: #28a745; color: white; }
+  .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+</style>
+
+<div class="header-row">
+  <h1>{{ title }}</h1>
+  <a href="{{ novo_url }}" class="button">+ Novo Usuário</a>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+    <p class="{% if message.tags %}{{ message.tags }}{% endif %}" style="padding:10px;border-radius:4px;margin-bottom:10px;">
+      {{ message }}
+    </p>
+  {% endfor %}
+{% endif %}
+
+{% if users %}
+<table class="usuario-table">
+  <thead>
+    <tr>
+      <th>E-mail</th>
+      <th>Nome</th>
+      <th>Papel</th>
+      <th>Staff</th>
+      <th>Status</th>
+      <th>Ações</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for user in users %}
+    <tr>
+      <td>{{ user.email }}</td>
+      <td>{{ user.get_full_name|default:user.username }}</td>
+      <td>
+        {% if user.profile %}
+          {% if user.profile.role == 'rh' %}
+            <span class="badge badge-rh">RH</span>
+          {% elif user.profile.role == 'lideranca' %}
+            <span class="badge badge-lideranca">Liderança</span>
+          {% else %}
+            {{ user.profile.get_role_display }}
+          {% endif %}
+        {% else %}
+          <span style="color:#999">—</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if user.is_staff %}
+          <span class="badge badge-staff">Staff</span>
+        {% else %}
+          <span style="color:#999">—</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if user.is_active %}
+          <span class="badge badge-ativo">Ativo</span>
+        {% else %}
+          <span class="badge badge-inativo">Inativo</span>
+        {% endif %}
+      </td>
+      <td style="white-space:nowrap">
+        <form method="post" action="{% url 'admin:tenants_empresa_usuario_senha' empresa.pk user.pk %}" style="display:inline">
+          {% csrf_token %}
+          <button type="submit" class="btn-sm btn-warning" onclick="return confirm('Resetar senha de {{ user.email }}?')">
+            Resetar Senha
+          </button>
+        </form>
+        &nbsp;
+        <form method="post" action="{% url 'admin:tenants_empresa_usuario_toggle' empresa.pk user.pk %}" style="display:inline">
+          {% csrf_token %}
+          <button type="submit" class="btn-sm {% if user.is_active %}btn-danger{% else %}btn-success{% endif %}">
+            {% if user.is_active %}Desativar{% else %}Ativar{% endif %}
+          </button>
+        </form>
+        &nbsp;
+        <form method="post" action="{% url 'admin:tenants_empresa_usuario_excluir' empresa.pk user.pk %}" style="display:inline">
+          {% csrf_token %}
+          <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Excluir permanentemente {{ user.email }}? Esta ação não pode ser desfeita.')">
+            Excluir
+          </button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p style="margin-top:0.5rem;color:#666">{{ users|length }} usuário(s) encontrado(s).</p>
+{% else %}
+<p style="padding:20px;background:#f8f8f8;border-radius:4px;color:#666">
+  Nenhum usuário cadastrado para esta empresa.
+  <a href="{{ novo_url }}">Criar o primeiro usuário →</a>
+</p>
+{% endif %}
+
+<div style="margin-top:2rem">
+  <a href="{{ voltar_url }}">&larr; Voltar para Empresas</a>
+</div>
+{% endblock %}

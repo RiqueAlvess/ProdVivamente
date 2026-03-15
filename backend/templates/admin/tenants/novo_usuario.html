@@ -1,0 +1,98 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Início</a>
+  &rsaquo; <a href="{% url 'admin:tenants_empresa_changelist' %}">Empresas</a>
+  &rsaquo; <a href="{{ voltar_url }}">{{ empresa.nome }}</a>
+  &rsaquo; Novo Usuário
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .form-table { width: 100%; max-width: 600px; border-collapse: collapse; }
+  .form-table th { text-align: right; padding: 10px 16px 10px 0; width: 180px; color: #666; font-weight: normal; vertical-align: top; padding-top: 12px; }
+  .form-table td { padding: 8px 0; }
+  .form-table input[type=text],
+  .form-table input[type=email],
+  .form-table input[type=password],
+  .form-table select { width: 100%; max-width: 380px; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+  .form-table .help { font-size: 12px; color: #999; margin-top: 3px; }
+  .form-actions { margin-top: 1.5rem; display: flex; gap: 1rem; align-items: center; }
+  .alert-info { padding: 10px 14px; background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; color: #0c5460; margin-bottom: 1rem; }
+</style>
+
+<h1>{{ title }}</h1>
+
+{% if messages %}
+  {% for message in messages %}
+    <p class="{% if message.tags %}{{ message.tags }}{% endif %}" style="padding:10px;border-radius:4px;margin-bottom:10px;">
+      {{ message }}
+    </p>
+  {% endfor %}
+{% endif %}
+
+<div class="alert-info">
+  O usuário será criado dentro do schema da empresa <strong>{{ empresa.nome }}</strong>.
+  Se você não informar uma senha, ela será gerada automaticamente — anote quando aparecer na tela.
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  <table class="form-table">
+    <tr>
+      <th><label for="id_email">E-mail *</label></th>
+      <td>
+        <input type="email" id="id_email" name="email" required autofocus value="{{ request.POST.email|default:'' }}">
+        <div class="help">Será usado como login no sistema.</div>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="id_first_name">Nome</label></th>
+      <td>
+        <input type="text" id="id_first_name" name="first_name" value="{{ request.POST.first_name|default:'' }}">
+      </td>
+    </tr>
+    <tr>
+      <th><label for="id_last_name">Sobrenome</label></th>
+      <td>
+        <input type="text" id="id_last_name" name="last_name" value="{{ request.POST.last_name|default:'' }}">
+      </td>
+    </tr>
+    <tr>
+      <th><label for="id_password">Senha</label></th>
+      <td>
+        <input type="text" id="id_password" name="password" value="{{ request.POST.password|default:'' }}" placeholder="Deixe vazio para gerar automaticamente">
+        <div class="help">Se deixar em branco, uma senha segura será gerada e exibida após salvar.</div>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="id_role">Papel</label></th>
+      <td>
+        <select id="id_role" name="role">
+          <option value="rh" {% if request.POST.role == 'rh' or not request.POST.role %}selected{% endif %}>RH (administrador do tenant)</option>
+          <option value="lideranca" {% if request.POST.role == 'lideranca' %}selected{% endif %}>Liderança</option>
+        </select>
+        <div class="help">RH tem acesso total ao sistema do tenant. Liderança tem acesso restrito.</div>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="id_is_staff">Acesso ao admin</label></th>
+      <td>
+        <input type="checkbox" id="id_is_staff" name="is_staff" {% if request.POST.is_staff %}checked{% endif %}>
+        <label for="id_is_staff" style="font-weight:normal">Permitir acesso ao Django Admin</label>
+        <div class="help">Marque para usuários que precisam acessar /admin/ neste tenant.</div>
+      </td>
+    </tr>
+  </table>
+
+  <div class="form-actions">
+    <button type="submit" class="button default">Criar Usuário</button>
+    <a href="{{ voltar_url }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

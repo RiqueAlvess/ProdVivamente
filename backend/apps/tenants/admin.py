@@ -3,6 +3,9 @@ import string
 
 from django.contrib import admin, messages
 from django.contrib.auth.models import User
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import path, reverse
+from django.utils.html import format_html
 from django_tenants.admin import TenantAdminMixin
 from django_tenants.utils import tenant_context
 
@@ -49,7 +52,7 @@ def _provision_admin_user(empresa, email, password=None):
 
 @admin.register(Empresa)
 class EmpresaAdmin(TenantAdminMixin, admin.ModelAdmin):
-    list_display = ['nome', 'schema_name', 'cnpj', 'admin_email', 'ativo', 'status_admin', 'created_at']
+    list_display = ['nome', 'schema_name', 'cnpj', 'admin_email', 'ativo', 'status_admin', 'acoes_tenant', 'created_at']
     list_filter = ['ativo', 'created_at']
     search_fields = ['nome', 'cnpj', 'schema_name', 'admin_email']
     prepopulated_fields = {'slug': ('nome',)}
@@ -80,6 +83,10 @@ class EmpresaAdmin(TenantAdminMixin, admin.ModelAdmin):
         }),
     )
 
+    # ------------------------------------------------------------------
+    # List display helpers
+    # ------------------------------------------------------------------
+
     @admin.display(description='Admin RH')
     def status_admin(self, obj):
         if not obj.admin_email:
@@ -90,6 +97,18 @@ class EmpresaAdmin(TenantAdminMixin, admin.ModelAdmin):
             return '✓ Provisionado' if exists else '✗ Não criado'
         except Exception:
             return '? Schema não encontrado'
+
+    @admin.display(description='Usuários')
+    def acoes_tenant(self, obj):
+        url = reverse('admin:tenants_empresa_usuarios', args=[obj.pk])
+        return format_html(
+            '<a class="button" href="{}" style="white-space:nowrap">👥 Gerenciar Usuários</a>',
+            url,
+        )
+
+    # ------------------------------------------------------------------
+    # save_model: auto-provision admin on create
+    # ------------------------------------------------------------------
 
     def save_model(self, request, obj, form, change):
         is_new = not change
@@ -115,6 +134,10 @@ class EmpresaAdmin(TenantAdminMixin, admin.ModelAdmin):
                     level=messages.WARNING,
                 )
 
+    # ------------------------------------------------------------------
+    # Actions
+    # ------------------------------------------------------------------
+
     @admin.action(description='Provisionar / Resetar senha do Admin RH')
     def provisionar_admin(self, request, queryset):
         erros = []
@@ -127,10 +150,7 @@ class EmpresaAdmin(TenantAdminMixin, admin.ModelAdmin):
                 action = 'criado' if created else 'senha resetada'
                 self.message_user(
                     request,
-                    (
-                        f'[{empresa.nome}] Admin {action}: '
-                        f'{empresa.admin_email} | Senha: {password}'
-                    ),
+                    f'[{empresa.nome}] Admin {action}: {empresa.admin_email} | Senha: {password}',
                     level=messages.SUCCESS,
                 )
             except Exception as e:
@@ -148,6 +168,174 @@ class EmpresaAdmin(TenantAdminMixin, admin.ModelAdmin):
     def desativar_tenants(self, request, queryset):
         updated = queryset.update(ativo=False)
         self.message_user(request, f'{updated} tenant(s) desativado(s).', level=messages.WARNING)
+
+    # ------------------------------------------------------------------
+    # Custom URLs for tenant user management
+    # ------------------------------------------------------------------
+
+    def get_urls(self):
+        urls = super().get_urls()
+        extra = [
+            path(
+                '<int:pk>/usuarios/',
+                self.admin_site.admin_view(self.usuarios_view),
+                name='tenants_empresa_usuarios',
+            ),
+            path(
+                '<int:pk>/usuarios/novo/',
+                self.admin_site.admin_view(self.novo_usuario_view),
+                name='tenants_empresa_usuario_novo',
+            ),
+            path(
+                '<int:pk>/usuarios/<int:user_id>/senha/',
+                self.admin_site.admin_view(self.resetar_senha_view),
+                name='tenants_empresa_usuario_senha',
+            ),
+            path(
+                '<int:pk>/usuarios/<int:user_id>/toggle/',
+                self.admin_site.admin_view(self.toggle_ativo_view),
+                name='tenants_empresa_usuario_toggle',
+            ),
+            path(
+                '<int:pk>/usuarios/<int:user_id>/excluir/',
+                self.admin_site.admin_view(self.excluir_usuario_view),
+                name='tenants_empresa_usuario_excluir',
+            ),
+        ]
+        return extra + urls
+
+    # ------------------------------------------------------------------
+    # Custom views
+    # ------------------------------------------------------------------
+
+    def usuarios_view(self, request, pk):
+        empresa = get_object_or_404(Empresa, pk=pk)
+
+        with tenant_context(empresa):
+            from apps.accounts.models import UserProfile
+            users = list(
+                User.objects.select_related('profile')
+                .filter(is_superuser=False)
+                .order_by('email')
+            )
+
+        context = {
+            **self.admin_site.each_context(request),
+            'empresa': empresa,
+            'users': users,
+            'title': f'Usuários — {empresa.nome}',
+            'novo_url': reverse('admin:tenants_empresa_usuario_novo', args=[pk]),
+            'voltar_url': reverse('admin:tenants_empresa_changelist'),
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/tenants/usuarios.html', context)
+
+    def novo_usuario_view(self, request, pk):
+        empresa = get_object_or_404(Empresa, pk=pk)
+        lista_url = reverse('admin:tenants_empresa_usuarios', args=[pk])
+
+        if request.method == 'POST':
+            email = request.POST.get('email', '').strip()
+            first_name = request.POST.get('first_name', '').strip()
+            last_name = request.POST.get('last_name', '').strip()
+            role = request.POST.get('role', 'rh')
+            password = request.POST.get('password', '').strip() or _generate_password()
+            is_staff = request.POST.get('is_staff') == 'on'
+
+            if not email:
+                messages.error(request, 'E-mail é obrigatório.')
+            else:
+                try:
+                    with tenant_context(empresa):
+                        from apps.accounts.models import UserProfile
+
+                        if User.objects.filter(email=email).exists():
+                            messages.error(request, f'Já existe um usuário com o e-mail {email}.')
+                        else:
+                            base_username = email.split('@')[0]
+                            username = base_username
+                            n = 1
+                            while User.objects.filter(username=username).exists():
+                                username = f'{base_username}{n}'
+                                n += 1
+
+                            user = User.objects.create_user(
+                                username=username,
+                                email=email,
+                                password=password,
+                                first_name=first_name,
+                                last_name=last_name,
+                                is_staff=is_staff,
+                                is_active=True,
+                            )
+                            UserProfile.objects.create(user=user, role=role)
+
+                            messages.success(
+                                request,
+                                f'✓ Usuário {email} criado! Senha: {password} — Anote agora, não será exibida novamente.',
+                            )
+                            return redirect(lista_url)
+                except Exception as e:
+                    messages.error(request, f'Erro ao criar usuário: {e}')
+
+        context = {
+            **self.admin_site.each_context(request),
+            'empresa': empresa,
+            'title': f'Novo Usuário — {empresa.nome}',
+            'voltar_url': lista_url,
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/tenants/novo_usuario.html', context)
+
+    def resetar_senha_view(self, request, pk, user_id):
+        empresa = get_object_or_404(Empresa, pk=pk)
+
+        if request.method == 'POST':
+            nova_senha = _generate_password()
+            with tenant_context(empresa):
+                try:
+                    user = User.objects.get(pk=user_id)
+                    user.set_password(nova_senha)
+                    user.save()
+                    messages.success(
+                        request,
+                        f'Nova senha de {user.email}: {nova_senha} — Anote agora, não será exibida novamente.',
+                    )
+                except User.DoesNotExist:
+                    messages.error(request, 'Usuário não encontrado.')
+
+        return redirect(reverse('admin:tenants_empresa_usuarios', args=[pk]))
+
+    def toggle_ativo_view(self, request, pk, user_id):
+        empresa = get_object_or_404(Empresa, pk=pk)
+
+        if request.method == 'POST':
+            with tenant_context(empresa):
+                try:
+                    user = User.objects.get(pk=user_id)
+                    user.is_active = not user.is_active
+                    user.save()
+                    estado = 'ativado' if user.is_active else 'desativado'
+                    messages.success(request, f'Usuário {user.email} {estado}.')
+                except User.DoesNotExist:
+                    messages.error(request, 'Usuário não encontrado.')
+
+        return redirect(reverse('admin:tenants_empresa_usuarios', args=[pk]))
+
+    def excluir_usuario_view(self, request, pk, user_id):
+        empresa = get_object_or_404(Empresa, pk=pk)
+
+        if request.method == 'POST':
+            with tenant_context(empresa):
+                try:
+                    user = User.objects.get(pk=user_id)
+                    email = user.email
+                    user.delete()
+                    messages.success(request, f'Usuário {email} removido.')
+                except User.DoesNotExist:
+                    messages.error(request, 'Usuário não encontrado.')
+
+        return redirect(reverse('admin:tenants_empresa_usuarios', args=[pk]))
 
 
 @admin.register(Domain)
