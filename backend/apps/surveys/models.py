@@ -48,7 +48,9 @@ class Campaign(models.Model):
         ('closed', 'Encerrado'),
     ]
 
-    # No empresa FK — schema isolation handles tenant separation
+    empresa = models.ForeignKey(
+        'tenants.Empresa', on_delete=models.CASCADE, related_name='campaigns'
+    )
     nome = models.CharField(max_length=255)
     descricao = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')

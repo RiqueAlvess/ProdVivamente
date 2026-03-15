@@ -39,7 +39,7 @@ def rebuild_star_schema(campaign_id: int):
     from django.db.models import Count
 
     try:
-        campaign = Campaign.objects.select_related('empresa').get(pk=campaign_id)
+        campaign = Campaign.objects.get(pk=campaign_id)
     except Campaign.DoesNotExist:
         logger.error('Campaign %d not found for star schema rebuild', campaign_id)
         return
@@ -85,11 +85,9 @@ def rebuild_star_schema(campaign_id: int):
 
         # Ensure DimEstrutura exists
         dim_estrutura, _ = DimEstrutura.objects.get_or_create(
-            empresa=campaign.empresa,
             unidade=unidade,
             setor=setor,
             defaults={
-                'empresa_nome': campaign.empresa.nome,
                 'unidade_nome': unidade.nome,
                 'setor_nome': setor.nome,
             }

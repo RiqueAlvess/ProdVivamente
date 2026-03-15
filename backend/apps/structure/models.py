@@ -1,19 +1,20 @@
 """
 Structure app models - Unidade, Setor, Cargo.
-With django-tenants, each empresa has its own schema — no empresa FK needed.
 """
 from django.db import models
 
 
 class Unidade(models.Model):
-    # No empresa FK — schema isolation handles tenant separation
+    empresa = models.ForeignKey(
+        'tenants.Empresa', on_delete=models.CASCADE, related_name='unidades'
+    )
     nome = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = 'Unidade'
         verbose_name_plural = 'Unidades'
-        unique_together = ['nome']
+        unique_together = ['empresa', 'nome']
         ordering = ['nome']
 
     def __str__(self):
@@ -38,14 +39,16 @@ class Setor(models.Model):
 
 
 class Cargo(models.Model):
-    # No empresa FK — schema isolation handles tenant separation
+    empresa = models.ForeignKey(
+        'tenants.Empresa', on_delete=models.CASCADE, related_name='cargos'
+    )
     nome = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = 'Cargo'
         verbose_name_plural = 'Cargos'
-        unique_together = ['nome']
+        unique_together = ['empresa', 'nome']
         ordering = ['nome']
 
     def __str__(self):
