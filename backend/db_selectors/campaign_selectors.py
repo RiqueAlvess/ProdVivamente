@@ -4,6 +4,8 @@ Campaign selectors - query layer for campaign data.
 import logging
 from typing import Dict, List
 
+from django.db import connection
+
 logger = logging.getLogger(__name__)
 
 
@@ -14,16 +16,11 @@ class CampaignSelectors:
     def get_campaigns_for_user(user) -> 'QuerySet':
         """Get all accessible campaigns for a user."""
         from apps.surveys.models import Campaign
-        from apps.tenants.models import Empresa
 
         if user.is_staff or user.is_superuser:
             return Campaign.objects.all()
 
-        if hasattr(user, 'profile'):
-            empresas = user.profile.empresas.filter(ativo=True)
-            return Campaign.objects.filter(empresa__in=empresas)
-
-        return Campaign.objects.none()
+        return Campaign.objects.filter(empresa=connection.tenant)
 
     @staticmethod
     def get_campaign_summary(campaign) -> Dict:

@@ -61,14 +61,8 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         ip = get_client_ip(request)
         ua = get_user_agent(request)
 
-        # Get primary empresa for logging
-        empresa = None
-        if hasattr(user, 'profile') and user.profile.empresas.exists():
-            empresa = user.profile.empresas.first()
-
         AuditLog.objects.create(
             user=user,
-            empresa=empresa,
             acao='login',
             descricao=f'Login via JWT - {user.username}',
             ip=ip,
@@ -105,15 +99,10 @@ class LogoutView(APIView):
         except TokenError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get empresa for logging
-        empresa = None
         user = request.user
-        if hasattr(user, 'profile') and user.profile.empresas.exists():
-            empresa = user.profile.empresas.first()
 
         AuditLog.objects.create(
             user=user,
-            empresa=empresa,
             acao='logout',
             descricao=f'Logout - {user.username}',
             ip=get_client_ip(request),
@@ -176,11 +165,8 @@ class AuditLogListView(generics.ListAPIView):
     permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
-        qs = AuditLog.objects.select_related('user', 'empresa').all()
-        empresa_id = self.request.query_params.get('empresa_id')
+        qs = AuditLog.objects.select_related('user').all()
         acao = self.request.query_params.get('acao')
-        if empresa_id:
-            qs = qs.filter(empresa_id=empresa_id)
         if acao:
             qs = qs.filter(acao=acao)
         return qs

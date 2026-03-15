@@ -17,6 +17,8 @@ from .serializers import (
     ChecklistNR1EtapaSerializer, ChecklistNR1ItemSerializer,
     EvidenciaNR1Serializer,
 )
+from django.db import connection
+
 from apps.tenants.models import Empresa
 from apps.surveys.models import Campaign
 from services.audit_service import AuditService
@@ -94,9 +96,7 @@ NR1_CHECKLIST_TEMPLATE = [
 def get_user_empresas(user):
     if user.is_staff or user.is_superuser:
         return Empresa.objects.filter(ativo=True)
-    if hasattr(user, 'profile'):
-        return user.profile.empresas.filter(ativo=True)
-    return Empresa.objects.none()
+    return Empresa.objects.filter(pk=connection.tenant.pk, ativo=True)
 
 
 class PlanoAcaoListCreateView(generics.ListCreateAPIView):

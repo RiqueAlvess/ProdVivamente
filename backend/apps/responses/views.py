@@ -13,6 +13,8 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
+from django.db import connection
+
 from .models import SurveyResponse
 from .serializers import (
     LGPDSerializer, DemographicsSerializer, AnswerSerializer, SubmitSerializer,
@@ -259,7 +261,7 @@ class ResponseListView(APIView):
             qs = SurveyResponse.objects.all()
         elif hasattr(user, 'profile'):
             qs = SurveyResponse.objects.filter(
-                campaign__empresa__in=user.profile.empresas.all()
+                campaign__empresa=connection.tenant
             )
         else:
             return Response([], status=status.HTTP_200_OK)

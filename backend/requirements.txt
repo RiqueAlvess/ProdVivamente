@@ -13,6 +13,8 @@ cryptography==42.0.8
 python-dotenv==1.0.1
 resend==2.3.0
 requests==2.32.3
+urllib3>=1.21.1,<2.4
+charset-normalizer>=2,<4
 python-docx==1.1.2
 openpyxl==3.1.5
 reportlab==4.2.2

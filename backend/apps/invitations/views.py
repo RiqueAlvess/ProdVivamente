@@ -11,6 +11,8 @@ from django.shortcuts import get_object_or_404
 
 from .models import SurveyInvitation
 from .serializers import SurveyInvitationSerializer
+from django.db import connection
+
 from apps.surveys.models import Campaign
 from apps.core.models import TaskQueue
 from apps.tenants.models import Empresa
@@ -26,15 +28,10 @@ def get_user_empresa(user, empresa_id=None):
         if empresa_id:
             return get_object_or_404(Empresa, pk=empresa_id)
         return None
-    if hasattr(user, 'profile'):
-        empresas = user.profile.empresas.filter(ativo=True)
-        if empresa_id:
-            emp = empresas.filter(pk=empresa_id).first()
-            if not emp:
-                raise PermissionError('Acesso negado a esta empresa.')
-            return emp
-        return empresas.first()
-    raise PermissionError('Usuário sem empresa associada.')
+    tenant = connection.tenant
+    if empresa_id and str(empresa_id) != str(tenant.pk):
+        raise PermissionError('Acesso negado a esta empresa.')
+    return tenant
 
 
 class ImportCSVView(APIView):
@@ -166,7 +163,7 @@ class InvitationListView(generics.ListAPIView):
         if user.is_staff or user.is_superuser:
             qs = SurveyInvitation.objects.all()
         elif hasattr(user, 'profile'):
-            qs = SurveyInvitation.objects.filter(empresa__in=user.profile.empresas.all())
+            qs = SurveyInvitation.objects.filter(empresa=connection.tenant)
         else:
             return SurveyInvitation.objects.none()
 
