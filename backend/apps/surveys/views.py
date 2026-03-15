@@ -10,6 +10,8 @@ from .serializers import (
     DimensaoSerializer, PerguntaSerializer, CampaignSerializer,
     CampaignCreateSerializer, CategoriaFatorRiscoSerializer, FatorRiscoSerializer,
 )
+from django.db import connection
+
 from apps.tenants.models import Empresa
 from services.audit_service import AuditService
 
@@ -19,9 +21,7 @@ logger = logging.getLogger(__name__)
 def get_user_empresas(user):
     if user.is_staff or user.is_superuser:
         return Empresa.objects.filter(ativo=True)
-    if hasattr(user, 'profile'):
-        return user.profile.empresas.filter(ativo=True)
-    return Empresa.objects.none()
+    return Empresa.objects.filter(pk=connection.tenant.pk, ativo=True)
 
 
 class DimensaoListView(generics.ListAPIView):

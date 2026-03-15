@@ -15,6 +15,8 @@ from .serializers import SectorAnalysisSerializer
 from apps.surveys.models import Campaign
 from apps.surveys.serializers import CampaignSerializer
 from apps.structure.serializers import SetorSerializer
+from django.db import connection
+
 from apps.tenants.models import Empresa
 from apps.core.models import TaskQueue
 from services.audit_service import AuditService
@@ -25,9 +27,7 @@ logger = logging.getLogger(__name__)
 def get_user_empresas(user):
     if user.is_staff or user.is_superuser:
         return Empresa.objects.filter(ativo=True)
-    if hasattr(user, 'profile'):
-        return user.profile.empresas.filter(ativo=True)
-    return Empresa.objects.none()
+    return Empresa.objects.filter(pk=connection.tenant.pk, ativo=True)
 
 
 def get_campaign_for_user(user, campaign_id):
@@ -63,9 +63,7 @@ class DashboardView(APIView):
         if role == 'lideranca':
             setor_id = request.query_params.get('setor_id')
             if not setor_id:
-                setores_permitidos = user.profile.setores_permitidos.filter(
-                    unidade__empresa=empresa
-                )
+                setores_permitidos = user.profile.setores_permitidos.all()
                 if not setores_permitidos.exists():
                     return Response({'error': 'Nenhum setor permitido configurado.'}, status=403)
                 return Response({

@@ -13,13 +13,8 @@ class AuditService:
     def log(user, empresa, acao: str, descricao: str, request=None) -> None:
         """
         Create an audit log entry.
-
-        Args:
-            user: Django User instance
-            empresa: Empresa instance
-            acao: Action code from AuditLog.ACOES
-            descricao: Human-readable description
-            request: Optional Django request for IP/UA extraction
+        Tenant isolation is handled by django-tenants (schema-based).
+        The empresa parameter is accepted for call-site compatibility but not stored.
         """
         from apps.accounts.models import AuditLog
 
@@ -37,7 +32,6 @@ class AuditService:
         try:
             AuditLog.objects.create(
                 user=user,
-                empresa=empresa,
                 acao=acao,
                 descricao=descricao,
                 ip=ip,
