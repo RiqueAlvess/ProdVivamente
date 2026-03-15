@@ -51,8 +51,8 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             serializer.is_valid(raise_exception=True)
         except Exception:
             logger.warning(
-                'Failed login attempt for username=%s from IP=%s',
-                request.data.get('username', ''),
+                'Failed login attempt for email=%s from IP=%s',
+                request.data.get('email', ''),
                 get_client_ip(request),
             )
             raise
