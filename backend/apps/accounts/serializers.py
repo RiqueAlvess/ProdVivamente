@@ -10,7 +10,13 @@ from apps.tenants.serializers import EmpresaPublicSerializer
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Custom JWT serializer that adds user info to token response."""
+    """Custom JWT serializer that accepts email login and adds user info to token response."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Replace the default username field with email
+        del self.fields[self.username_field]
+        self.fields['email'] = serializers.EmailField()
 
     @classmethod
     def get_token(cls, user):
@@ -23,6 +29,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
+        email = attrs.pop('email')
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(
+                {'email': 'Nenhuma conta encontrada com este e-mail.'}
+            )
+        attrs[self.username_field] = user.username
+
         data = super().validate(attrs)
         user = self.user
         data['user'] = {
