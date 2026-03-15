@@ -1,0 +1,114 @@
+from django.conf import settings
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+
+    initial = True
+
+    dependencies = [
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='CategoriaFatorRisco',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('nome', models.CharField(max_length=255, unique=True)),
+                ('descricao', models.TextField(blank=True)),
+                ('ordem', models.IntegerField(default=0)),
+            ],
+            options={
+                'verbose_name': 'Categoria de Fator de Risco',
+                'verbose_name_plural': 'Categorias de Fatores de Risco',
+                'ordering': ['ordem', 'nome'],
+            },
+        ),
+        migrations.CreateModel(
+            name='Dimensao',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('codigo', models.CharField(max_length=50, unique=True)),
+                ('nome', models.CharField(max_length=255)),
+                ('tipo', models.CharField(choices=[('positivo', 'Positivo'), ('negativo', 'Negativo')], max_length=10)),
+                ('descricao', models.TextField(blank=True)),
+                ('ordem', models.IntegerField(default=0)),
+            ],
+            options={
+                'verbose_name': 'Dimensão',
+                'verbose_name_plural': 'Dimensões',
+                'ordering': ['ordem', 'nome'],
+            },
+        ),
+        migrations.CreateModel(
+            name='Campaign',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('nome', models.CharField(max_length=255)),
+                ('descricao', models.TextField(blank=True)),
+                ('status', models.CharField(choices=[('draft', 'Rascunho'), ('active', 'Ativo'), ('closed', 'Encerrado')], default='draft', max_length=20)),
+                ('data_inicio', models.DateField(blank=True, null=True)),
+                ('data_fim', models.DateField(blank=True, null=True)),
+                ('meta_adesao', models.IntegerField(default=70, help_text='Meta de adesão em %')),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+                ('closed_at', models.DateTimeField(blank=True, null=True)),
+                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='campaigns_criadas', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={
+                'verbose_name': 'Campanha',
+                'verbose_name_plural': 'Campanhas',
+                'ordering': ['-created_at'],
+            },
+        ),
+        migrations.CreateModel(
+            name='Pergunta',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('numero', models.IntegerField(unique=True)),
+                ('texto', models.TextField()),
+                ('ativo', models.BooleanField(default=True)),
+                ('dimensao', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='perguntas', to='surveys.dimensao')),
+            ],
+            options={
+                'verbose_name': 'Pergunta',
+                'verbose_name_plural': 'Perguntas',
+                'ordering': ['numero'],
+            },
+        ),
+        migrations.CreateModel(
+            name='FatorRisco',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('nome', models.CharField(max_length=255)),
+                ('descricao', models.TextField(blank=True)),
+                ('probabilidade_base', models.IntegerField(default=1, help_text='1=Improvável, 2=Possível, 3=Provável, 4=Frequente')),
+                ('severidade_base', models.IntegerField(default=1, help_text='1=Insignificante, 2=Leve, 3=Moderada, 4=Grave, 5=Catastrófica')),
+                ('acoes_preventivas', models.TextField(blank=True)),
+                ('categoria', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='fatores', to='surveys.categoriafatorrisco')),
+                ('dimensao', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='fatores_risco', to='surveys.dimensao')),
+            ],
+            options={
+                'verbose_name': 'Fator de Risco',
+                'verbose_name_plural': 'Fatores de Risco',
+                'ordering': ['categoria', 'nome'],
+            },
+        ),
+        migrations.CreateModel(
+            name='SeveridadePorCNAE',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('cnae_prefixo', models.CharField(help_text='CNAE prefix (e.g. "47" for retail)', max_length=10)),
+                ('severidade_ajustada', models.IntegerField(default=1, help_text='Adjusted severity for this CNAE category')),
+                ('justificativa', models.TextField(blank=True)),
+                ('fator_risco', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='severidades_cnae', to='surveys.fatorrisco')),
+            ],
+            options={
+                'verbose_name': 'Severidade por CNAE',
+                'verbose_name_plural': 'Severidades por CNAE',
+                'unique_together': {('fator_risco', 'cnae_prefixo')},
+            },
+        ),
+    ]

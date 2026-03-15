@@ -1,0 +1,75 @@
+from django.conf import settings
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+
+    initial = True
+
+    dependencies = [
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+        ('tenants', '0001_initial'),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='TaskQueue',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('task_type', models.CharField(max_length=100)),
+                ('payload', models.JSONField(default=dict)),
+                ('status', models.CharField(choices=[('pending', 'Pendente'), ('processing', 'Processando'), ('completed', 'Concluído'), ('failed', 'Falhou')], default='pending', max_length=20)),
+                ('attempts', models.IntegerField(default=0)),
+                ('max_attempts', models.IntegerField(default=3)),
+                ('error_message', models.TextField(blank=True)),
+                ('file_path', models.CharField(blank=True, max_length=500)),
+                ('file_name', models.CharField(blank=True, max_length=255)),
+                ('file_size', models.BigIntegerField(blank=True, null=True)),
+                ('file_url', models.URLField(blank=True)),
+                ('progress', models.IntegerField(default=0)),
+                ('progress_message', models.CharField(blank=True, max_length=255)),
+                ('started_at', models.DateTimeField(blank=True, null=True)),
+                ('completed_at', models.DateTimeField(blank=True, null=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('user', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='tasks', to=settings.AUTH_USER_MODEL)),
+                ('empresa', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='tenants.empresa')),
+            ],
+            options={
+                'verbose_name': 'Fila de Tarefas',
+                'verbose_name_plural': 'Fila de Tarefas',
+                'ordering': ['-created_at'],
+                'indexes': [
+                    models.Index(fields=['status', 'created_at'], name='core_taskqueue_status_created_idx'),
+                    models.Index(fields=['user', 'status'], name='core_taskqueue_user_status_idx'),
+                ],
+            },
+        ),
+        migrations.CreateModel(
+            name='UserNotification',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('notification_type', models.CharField(choices=[('task_completed', 'Tarefa Concluída'), ('task_failed', 'Tarefa Falhou'), ('file_ready', 'Arquivo Pronto'), ('info', 'Informação'), ('warning', 'Aviso'), ('error', 'Erro')], max_length=30)),
+                ('title', models.CharField(max_length=255)),
+                ('message', models.TextField()),
+                ('link_url', models.URLField(blank=True)),
+                ('is_read', models.BooleanField(default=False)),
+                ('read_at', models.DateTimeField(blank=True, null=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='notifications', to=settings.AUTH_USER_MODEL)),
+                ('task', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='core.taskqueue')),
+            ],
+            options={
+                'verbose_name': 'Notificação',
+                'verbose_name_plural': 'Notificações',
+                'ordering': ['-created_at'],
+                'constraints': [
+                    models.UniqueConstraint(
+                        condition=models.Q(task__isnull=False),
+                        fields=['user', 'task', 'notification_type'],
+                        name='unique_user_task_notification',
+                    ),
+                ],
+            },
+        ),
+    ]
