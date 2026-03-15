@@ -17,7 +17,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120 --reload
     volumes:
       - ./backend:/app
       - media_files:/app/media
@@ -29,7 +29,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DJANGO_SETTINGS_MODULE=config.settings.development
 
   celery_worker:
     build:
@@ -45,7 +45,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DJANGO_SETTINGS_MODULE=config.settings.development
 
   celery_beat:
     build:
@@ -60,7 +60,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DJANGO_SETTINGS_MODULE=config.settings.development
 
   frontend:
     build:
