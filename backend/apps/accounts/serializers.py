@@ -91,6 +91,46 @@ class AuditLogSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class CreateUserSerializer(serializers.Serializer):
+    """Used by RH admins to create users inside their tenant via API."""
+    email = serializers.EmailField()
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150, default='', required=False)
+    password = serializers.CharField(min_length=8, write_only=True)
+    role = serializers.ChoiceField(choices=UserProfile.ROLES, default='rh')
+    telefone = serializers.CharField(max_length=20, default='', required=False)
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError('Já existe um usuário com este e-mail.')
+        return value
+
+    def create(self, validated_data):
+        role = validated_data.pop('role', 'rh')
+        telefone = validated_data.pop('telefone', '')
+        password = validated_data.pop('password')
+        email = validated_data['email']
+
+        base_username = email.split('@')[0]
+        username = base_username
+        n = 1
+        while User.objects.filter(username=username).exists():
+            username = f'{base_username}{n}'
+            n += 1
+
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
+            is_staff=False,
+            is_active=True,
+        )
+        UserProfile.objects.create(user=user, role=role, telefone=telefone)
+        return user
+
+
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True, write_only=True)
     new_password = serializers.CharField(required=True, write_only=True, min_length=8)
