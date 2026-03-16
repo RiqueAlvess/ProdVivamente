@@ -2,10 +2,19 @@
 Accounts serializers - JWT auth, user profile.
 """
 from django.contrib.auth.models import User
+from django.db import ProgrammingError
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import UserProfile, AuditLog
+
+
+def _get_profile_safe(user):
+    """Return the UserProfile for a user, or None if it doesn't exist or the table is missing."""
+    try:
+        return user.profile
+    except (UserProfile.DoesNotExist, ProgrammingError, Exception):
+        return None
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -23,13 +32,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['username'] = user.username
         token['email'] = user.email
         token['is_staff'] = user.is_staff
-        try:
-            token['role'] = user.profile.role
-        except Exception:
-            pass
+        profile = _get_profile_safe(user)
+        if profile:
+            token['role'] = profile.role
         return token
 
     def validate(self, attrs):
+        from django.db import connection
+        from django_tenants.utils import get_tenant_model, tenant_context
+
         email = attrs.pop('email')
         try:
             user = User.objects.get(email=email)
@@ -49,10 +60,30 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'last_name': user.last_name,
             'is_staff': user.is_staff,
         }
-        try:
-            data['user']['role'] = user.profile.role
-        except Exception:
-            pass
+
+        current_schema = connection.schema_name
+
+        if current_schema != 'public':
+            # Already in a tenant schema (request came via tenant domain or X-Tenant-Schema header)
+            profile = _get_profile_safe(user)
+            if profile:
+                data['user']['role'] = profile.role
+            data['tenant_schema'] = current_schema
+        else:
+            # Public schema — search tenant schemas to find where this user has a profile.
+            TenantModel = get_tenant_model()
+            tenants = TenantModel.objects.exclude(schema_name='public').filter(ativo=True)
+            for tenant in tenants:
+                try:
+                    with tenant_context(tenant):
+                        profile = _get_profile_safe(user)
+                        if profile is not None:
+                            data['user']['role'] = profile.role
+                            data['tenant_schema'] = tenant.schema_name
+                            break
+                except Exception:
+                    continue
+
         return data
 
 
@@ -64,7 +95,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    profile = UserProfileSerializer(read_only=True)
+    profile = serializers.SerializerMethodField()
     full_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -77,6 +108,12 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_full_name(self, obj):
         return obj.get_full_name() or obj.username
+
+    def get_profile(self, obj):
+        profile = _get_profile_safe(obj)
+        if profile is None:
+            return None
+        return UserProfileSerializer(profile).data
 
 
 class AuditLogSerializer(serializers.ModelSerializer):

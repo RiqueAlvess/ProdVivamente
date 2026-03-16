@@ -69,6 +69,7 @@ PUBLIC_SCHEMA_URLCONF = 'config.urls_public'
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # must be before TenantMainMiddleware to handle preflight
     'django_tenants.middleware.main.TenantMainMiddleware',
+    'config.tenant_middleware.TenantFromHeaderMiddleware',  # X-Tenant-Schema header fallback
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
