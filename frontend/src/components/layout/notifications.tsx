@@ -37,7 +37,7 @@ export function Notifications() {
 
   async function markAsRead(id: number) {
     try {
-      await api.patch(`/core/notifications/${id}/`, { is_read: true });
+      await api.post(`/core/notifications/${id}/read/`);
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       );

@@ -84,14 +84,17 @@ def process_csv_import(self, task_id: int):
                         nome=row['cargo'].strip(),
                     )
 
-                # Encrypt PII
-                email_enc = crypto_service.encrypt(row['email'].lower())
+                # Encrypt PII and compute display hash
+                email_lower = row['email'].lower()
+                email_enc = crypto_service.encrypt(email_lower)
                 nome_enc = crypto_service.encrypt(row['nome'])
+                email_hash = crypto_service.compute_email_hash(email_lower)
 
                 # Create invitation
                 invitation = SurveyInvitation.objects.create(
                     hash_token=token_service.generate_token(),
                     email_encrypted=email_enc,
+                    email_hash=email_hash,
                     nome_encrypted=nome_enc,
                     empresa=empresa,
                     campaign=campaign,

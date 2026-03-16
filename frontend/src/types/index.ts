@@ -57,18 +57,39 @@ export interface Campaign {
 
 // ─── Invitation ──────────────────────────────────────────────────────────────
 
-export type InvitationStatus = 'pending' | 'sent' | 'opened' | 'completed' | 'bounced';
+export type InvitationStatus = 'pending' | 'sent' | 'used' | 'expired';
 
 export interface Invitation {
   id: number;
   campaign: number;
-  email: string;
-  sector: number;
-  sector_name?: string;
-  token: string;
+  /** LGPD: first 16 chars of HMAC-SHA256 hash — never the real email */
+  email_hash: string;
+  email_display: string;
+  unidade?: number;
+  unidade_nome?: string;
+  setor?: number;
+  setor_nome?: string;
+  cargo?: number;
+  cargo_nome?: string;
   status: InvitationStatus;
   sent_at?: string;
   completed_at?: string;
+  expires_at?: string;
+  created_at: string;
+}
+
+export interface InvitationStats {
+  total: number;
+  pending: number;
+  sent: number;
+  used: number;
+  expired: number;
+}
+
+export interface InvitationListResponse {
+  count: number;
+  results: Invitation[];
+  stats: InvitationStats;
 }
 
 // ─── Survey ──────────────────────────────────────────────────────────────────

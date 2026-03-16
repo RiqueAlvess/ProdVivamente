@@ -1,7 +1,10 @@
 """
 AES-256-GCM encryption service for PII fields.
+HMAC-SHA256 for irreversible display hashes (LGPD compliance).
 """
 import base64
+import hashlib
+import hmac
 import os
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -49,6 +52,24 @@ class CryptoService:
             return value
         except Exception:
             return self.encrypt(value)
+
+    def compute_email_hash(self, email: str) -> str:
+        """
+        Compute a deterministic, irreversible HMAC-SHA256 hash of an email address.
+
+        Used for LGPD-compliant display on the frontend — the actual email is never
+        exposed via API. The hash is consistent (same email → same hash) and cannot
+        be reversed without the secret key.
+
+        Returns: first 16 hex characters of HMAC-SHA256(SECRET_KEY, email.lower())
+        """
+        secret = getattr(settings, 'EMAIL_HASH_SECRET', settings.SECRET_KEY)
+        digest = hmac.new(
+            secret.encode('utf-8'),
+            email.lower().strip().encode('utf-8'),
+            hashlib.sha256,
+        ).hexdigest()
+        return digest[:16]
 
 
 try:

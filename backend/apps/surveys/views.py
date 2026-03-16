@@ -64,7 +64,13 @@ class CampaignListCreateView(generics.ListCreateAPIView):
         return qs
 
     def perform_create(self, serializer):
-        campaign = serializer.save(created_by=self.request.user)
+        # Auto-set empresa from current tenant if not provided by client
+        empresa_id = serializer.validated_data.get('empresa')
+        if not empresa_id:
+            tenant_empresa = get_user_empresas(self.request.user).first()
+            campaign = serializer.save(created_by=self.request.user, empresa=tenant_empresa)
+        else:
+            campaign = serializer.save(created_by=self.request.user)
         empresa = campaign.empresa
         AuditService.log(
             self.request.user, empresa, 'create_campaign',
