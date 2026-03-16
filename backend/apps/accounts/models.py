@@ -70,9 +70,9 @@ class AuditLog(models.Model):
         verbose_name_plural = 'Logs de Auditoria'
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['user', 'created_at']),
-            models.Index(fields=['empresa', 'created_at']),
-            models.Index(fields=['acao', 'created_at']),
+            models.Index(fields=['user', 'created_at'], name='accounts_au_user_id_idx'),
+            models.Index(fields=['empresa', 'created_at'], name='accounts_au_empresa_idx'),
+            models.Index(fields=['acao', 'created_at'], name='accounts_au_acao_idx'),
         ]
 
     def __str__(self):

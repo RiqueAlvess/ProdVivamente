@@ -93,7 +93,7 @@ class FactScoreDimensao(models.Model):
 
 class FactIndicadorCampanha(models.Model):
     """Fact: campaign-level KPIs."""
-    campaign = models.ForeignKey('surveys.Campaign', on_delete=models.CASCADE, unique=True)
+    campaign = models.OneToOneField('surveys.Campaign', on_delete=models.CASCADE)
     total_convidados = models.IntegerField(default=0)
     total_respondidos = models.IntegerField(default=0)
     taxa_adesao = models.FloatField(default=0.0)
