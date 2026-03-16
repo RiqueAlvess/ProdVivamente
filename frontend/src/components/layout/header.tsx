@@ -19,7 +19,9 @@ export function Header({ title }: HeaderProps) {
         <Notifications />
         <div className="text-sm text-right hidden sm:block">
           <p className="font-medium">{user?.first_name} {user?.last_name}</p>
-          <p className="text-muted-foreground text-xs capitalize">{user?.role}</p>
+          <p className="text-muted-foreground text-xs capitalize">
+            {user?.role === 'rh' ? 'RH' : user?.role === 'lideranca' ? 'Liderança' : user?.role}
+          </p>
         </div>
       </div>
     </header>

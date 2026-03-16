@@ -10,7 +10,6 @@ from .serializers import (
     DimensaoSerializer, PerguntaSerializer, CampaignSerializer,
     CampaignCreateSerializer, CategoriaFatorRiscoSerializer, FatorRiscoSerializer,
 )
-from django.db import connection
 
 from apps.tenants.models import Empresa
 from services.audit_service import AuditService
@@ -19,20 +18,27 @@ logger = logging.getLogger(__name__)
 
 
 def get_user_empresas(user):
+    """Retorna as empresas que o usuário pode ver."""
     if user.is_staff or user.is_superuser:
         return Empresa.objects.filter(ativo=True)
-    return Empresa.objects.filter(pk=connection.tenant.pk, ativo=True)
+    try:
+        empresa = user.profile.empresa
+        if empresa and empresa.ativo:
+            return Empresa.objects.filter(pk=empresa.pk)
+    except Exception:
+        pass
+    return Empresa.objects.none()
 
 
 class DimensaoListView(generics.ListAPIView):
-    """GET /api/surveys/dimensoes/ - list all HSE-IT dimensions"""
+    """GET /api/surveys/dimensoes/ — lista dimensões HSE-IT"""
     serializer_class = DimensaoSerializer
     permission_classes = [permissions.IsAuthenticated]
     queryset = Dimensao.objects.all()
 
 
 class PerguntaListView(generics.ListAPIView):
-    """GET /api/surveys/perguntas/ - list all questions"""
+    """GET /api/surveys/perguntas/ — lista perguntas"""
     serializer_class = PerguntaSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -64,16 +70,14 @@ class CampaignListCreateView(generics.ListCreateAPIView):
         return qs
 
     def perform_create(self, serializer):
-        # Auto-set empresa from current tenant if not provided by client
         empresa_id = serializer.validated_data.get('empresa')
         if not empresa_id:
-            tenant_empresa = get_user_empresas(self.request.user).first()
-            campaign = serializer.save(created_by=self.request.user, empresa=tenant_empresa)
+            empresa = get_user_empresas(self.request.user).first()
+            campaign = serializer.save(created_by=self.request.user, empresa=empresa)
         else:
             campaign = serializer.save(created_by=self.request.user)
-        empresa = campaign.empresa
         AuditService.log(
-            self.request.user, empresa, 'create_campaign',
+            self.request.user, campaign.empresa, 'create_campaign',
             f'Campanha criada: {campaign.nome}', self.request
         )
 
@@ -92,7 +96,7 @@ class CampaignDetailView(generics.RetrieveUpdateAPIView):
 
 
 class CampaignActivateView(APIView):
-    """POST /api/surveys/campaigns/{id}/activate/ - activate a draft campaign"""
+    """POST /api/surveys/campaigns/{id}/activate/"""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
@@ -109,7 +113,7 @@ class CampaignActivateView(APIView):
 
 
 class CampaignCloseView(APIView):
-    """POST /api/surveys/campaigns/{id}/close/ - close an active campaign"""
+    """POST /api/surveys/campaigns/{id}/close/"""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):

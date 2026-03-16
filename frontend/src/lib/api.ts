@@ -5,19 +5,16 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// JWT + tenant interceptor - attach token and tenant schema to all requests
+// JWT interceptor - anexa token a todas as requisições
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('access_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
-
-    const tenantSchema = localStorage.getItem('tenant_schema');
-    if (tenantSchema) config.headers['X-Tenant-Schema'] = tenantSchema;
   }
   return config;
 });
 
-// Refresh token on 401
+// Refresh token em caso de 401
 api.interceptors.response.use(
   (response) => response,
   async (error) => {

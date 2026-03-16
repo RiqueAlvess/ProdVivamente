@@ -2,7 +2,6 @@
 Accounts serializers - JWT auth, user profile.
 """
 from django.contrib.auth.models import User
-from django.db import ProgrammingError
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -10,19 +9,18 @@ from .models import UserProfile, AuditLog
 
 
 def _get_profile_safe(user):
-    """Return the UserProfile for a user, or None if it doesn't exist or the table is missing."""
+    """Retorna o UserProfile do usuário, ou None se não existir."""
     try:
         return user.profile
-    except (UserProfile.DoesNotExist, ProgrammingError, Exception):
+    except (UserProfile.DoesNotExist, Exception):
         return None
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Custom JWT serializer that accepts email login and adds user info to token response."""
+    """Serializer JWT customizado que aceita login por e-mail."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Replace the default username field with email
         del self.fields[self.username_field]
         self.fields['email'] = serializers.EmailField()
 
@@ -35,12 +33,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         profile = _get_profile_safe(user)
         if profile:
             token['role'] = profile.role
+            if profile.empresa_id:
+                token['empresa_id'] = profile.empresa_id
         return token
 
     def validate(self, attrs):
-        from django.db import connection
-        from django_tenants.utils import get_tenant_model, tenant_context
-
         email = attrs.pop('email')
         try:
             user = User.objects.get(email=email)
@@ -52,6 +49,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         data = super().validate(attrs)
         user = self.user
+        profile = _get_profile_safe(user)
+
         data['user'] = {
             'id': user.id,
             'username': user.username,
@@ -61,37 +60,22 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'is_staff': user.is_staff,
         }
 
-        current_schema = connection.schema_name
-
-        if current_schema != 'public':
-            # Already in a tenant schema (request came via tenant domain or X-Tenant-Schema header)
-            profile = _get_profile_safe(user)
-            if profile:
-                data['user']['role'] = profile.role
-            data['tenant_schema'] = current_schema
-        else:
-            # Public schema — search tenant schemas to find where this user has a profile.
-            TenantModel = get_tenant_model()
-            tenants = TenantModel.objects.exclude(schema_name='public').filter(ativo=True)
-            for tenant in tenants:
-                try:
-                    with tenant_context(tenant):
-                        profile = _get_profile_safe(user)
-                        if profile is not None:
-                            data['user']['role'] = profile.role
-                            data['tenant_schema'] = tenant.schema_name
-                            break
-                except Exception:
-                    continue
+        if profile:
+            data['user']['role'] = profile.role
+            if profile.empresa:
+                data['user']['empresa_id'] = profile.empresa_id
+                data['user']['empresa_nome'] = profile.empresa.nome
 
         return data
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    empresa_nome = serializers.CharField(source='empresa.nome', read_only=True)
+
     class Meta:
         model = UserProfile
-        fields = ['id', 'role', 'telefone', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = ['id', 'role', 'empresa', 'empresa_nome', 'telefone', 'created_at']
+        read_only_fields = ['id', 'created_at', 'empresa_nome']
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -129,7 +113,7 @@ class AuditLogSerializer(serializers.ModelSerializer):
 
 
 class CreateUserSerializer(serializers.Serializer):
-    """Used by RH admins to create users inside their tenant via API."""
+    """Usado por admins RH para criar usuários na empresa."""
     email = serializers.EmailField()
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150, default='', required=False)
@@ -146,6 +130,7 @@ class CreateUserSerializer(serializers.Serializer):
         role = validated_data.pop('role', 'rh')
         telefone = validated_data.pop('telefone', '')
         password = validated_data.pop('password')
+        empresa = self.context.get('empresa')
         email = validated_data['email']
 
         base_username = email.split('@')[0]
@@ -164,7 +149,7 @@ class CreateUserSerializer(serializers.Serializer):
             is_staff=False,
             is_active=True,
         )
-        UserProfile.objects.create(user=user, role=role, telefone=telefone)
+        UserProfile.objects.create(user=user, role=role, telefone=telefone, empresa=empresa)
         return user
 
 

@@ -1,9 +1,6 @@
 import logging
 
 from rest_framework import generics, permissions
-from rest_framework.response import Response
-
-from django.db import connection
 
 from .models import Unidade, Setor, Cargo
 from .serializers import UnidadeSerializer, UnidadeSimpleSerializer, SetorSerializer, CargoSerializer
@@ -13,9 +10,16 @@ logger = logging.getLogger(__name__)
 
 
 def get_user_empresas(user):
+    """Retorna as empresas que o usuário pode ver."""
     if user.is_staff or user.is_superuser:
         return Empresa.objects.filter(ativo=True)
-    return Empresa.objects.filter(pk=connection.tenant.pk, ativo=True)
+    try:
+        empresa = user.profile.empresa
+        if empresa and empresa.ativo:
+            return Empresa.objects.filter(pk=empresa.pk)
+    except Exception:
+        pass
+    return Empresa.objects.none()
 
 
 class UnidadeListCreateView(generics.ListCreateAPIView):

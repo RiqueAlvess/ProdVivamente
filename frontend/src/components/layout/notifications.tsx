@@ -55,6 +55,13 @@ export function Notifications() {
     error: 'bg-red-100 text-red-800',
   };
 
+  const typeLabels: Record<string, string> = {
+    info: 'Info',
+    warning: 'Aviso',
+    success: 'Sucesso',
+    error: 'Erro',
+  };
+
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
@@ -88,7 +95,7 @@ export function Notifications() {
             >
               <div className="flex items-center gap-2 w-full">
                 <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${typeColors[notification.type]}`}>
-                  {notification.type}
+                  {typeLabels[notification.type] ?? notification.type}
                 </span>
                 <span className="text-xs text-muted-foreground ml-auto">
                   {formatDate(notification.created_at)}

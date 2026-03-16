@@ -1,13 +1,26 @@
-// ─── Auth ───────────────────────────────────────────────────────────────────
+// ─── Autenticação ────────────────────────────────────────────────────────────
 
 export interface User {
   id: number;
   email: string;
+  username: string;
   first_name: string;
   last_name: string;
-  role: 'admin' | 'hr' | 'leadership' | 'respondent';
-  company: number;
-  sector?: number;
+  is_staff: boolean;
+  is_active: boolean;
+  role?: 'rh' | 'lideranca';
+  empresa_id?: number;
+  empresa_nome?: string;
+  profile?: UserProfile;
+}
+
+export interface UserProfile {
+  id: number;
+  role: 'rh' | 'lideranca';
+  empresa?: number;
+  empresa_nome?: string;
+  telefone?: string;
+  created_at: string;
 }
 
 export interface AuthTokens {
@@ -20,32 +33,31 @@ export interface LoginCredentials {
   password: string;
 }
 
-// ─── Company / Sector ────────────────────────────────────────────────────────
+// ─── Empresa ─────────────────────────────────────────────────────────────────
 
-export interface Company {
+export interface Empresa {
   id: number;
-  name: string;
+  nome: string;
   cnpj: string;
-  plan: 'starter' | 'professional' | 'enterprise';
+  slug: string;
+  total_funcionarios: number;
+  cnae: string;
+  cnae_descricao: string;
+  admin_email: string;
+  ativo: boolean;
   created_at: string;
+  updated_at: string;
 }
 
-export interface Sector {
-  id: number;
-  name: string;
-  company: number;
-  parent?: number;
-}
+// ─── Campanha ─────────────────────────────────────────────────────────────────
 
-// ─── Campaign ────────────────────────────────────────────────────────────────
-
-export type CampaignStatus = 'draft' | 'active' | 'closed' | 'archived';
+export type StatusCampanha = 'draft' | 'active' | 'closed' | 'archived';
 
 export interface Campaign {
   id: number;
   name: string;
   company: number;
-  status: CampaignStatus;
+  status: StatusCampanha;
   start_date: string;
   end_date: string;
   created_at: string;
@@ -55,14 +67,18 @@ export interface Campaign {
   response_rate?: number;
 }
 
-// ─── Invitation ──────────────────────────────────────────────────────────────
+// Aliases em inglês mantidos para compatibilidade com componentes existentes
+export type CampaignStatus = StatusCampanha;
 
-export type InvitationStatus = 'pending' | 'sent' | 'used' | 'expired';
+// ─── Convite ─────────────────────────────────────────────────────────────────
+
+export type StatusConvite = 'pending' | 'sent' | 'used' | 'expired';
+export type InvitationStatus = StatusConvite;
 
 export interface Invitation {
   id: number;
   campaign: number;
-  /** LGPD: first 16 chars of HMAC-SHA256 hash — never the real email */
+  /** LGPD: primeiros 16 chars do hash HMAC-SHA256 — nunca o e-mail real */
   email_hash: string;
   email_display: string;
   unidade?: number;
@@ -71,14 +87,14 @@ export interface Invitation {
   setor_nome?: string;
   cargo?: number;
   cargo_nome?: string;
-  status: InvitationStatus;
+  status: StatusConvite;
   sent_at?: string;
   completed_at?: string;
   expires_at?: string;
   created_at: string;
 }
 
-export interface InvitationStats {
+export interface EstatisticasConvite {
   total: number;
   pending: number;
   sent: number;
@@ -86,13 +102,15 @@ export interface InvitationStats {
   expired: number;
 }
 
+export interface InvitationStats extends EstatisticasConvite {}
+
 export interface InvitationListResponse {
   count: number;
   results: Invitation[];
-  stats: InvitationStats;
+  stats: EstatisticasConvite;
 }
 
-// ─── Survey ──────────────────────────────────────────────────────────────────
+// ─── Pesquisa ─────────────────────────────────────────────────────────────────
 
 export interface SurveyQuestion {
   id: number;
@@ -129,14 +147,15 @@ export interface SurveyData {
 
 // ─── Analytics / Dashboard ───────────────────────────────────────────────────
 
-export type RiskLevel = 'critical' | 'high' | 'medium' | 'low';
+export type NivelRisco = 'critical' | 'high' | 'medium' | 'low';
+export type RiskLevel = NivelRisco;
 
 export interface DashboardMetrics {
   total_invited: number;
   total_responded: number;
   response_rate: number;
   igrp_score: number;
-  igrp_level: RiskLevel;
+  igrp_level: NivelRisco;
   dimension_scores: DimensionScore[];
   risk_distribution: RiskDistribution;
   top_critical_sectors: SectorRisk[];
@@ -161,7 +180,7 @@ export interface SectorRisk {
   sector_id: number;
   sector_name: string;
   igrp_score: number;
-  risk_level: RiskLevel;
+  risk_level: NivelRisco;
   response_count: number;
 }
 
@@ -170,7 +189,7 @@ export interface HeatmapCell {
   sector_name: string;
   dimension: string;
   score: number;
-  risk_level: RiskLevel;
+  risk_level: NivelRisco;
 }
 
 export interface DemographicScores {
@@ -209,27 +228,28 @@ export interface ChecklistProgress {
   stages: { stage_number: number; stage_name: string; progress: number }[];
 }
 
-// ─── Action Plans ────────────────────────────────────────────────────────────
+// ─── Planos de Ação ───────────────────────────────────────────────────────────
 
-export type ActionStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type StatusAcao = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type ActionStatus = StatusAcao;
 
 export interface ActionPlan {
   id: number;
   campaign: number;
   title: string;
   description: string;
-  status: ActionStatus;
+  status: StatusAcao;
   responsible?: string;
   due_date?: string;
   sector?: number;
   sector_name?: string;
   dimension?: string;
-  risk_level?: RiskLevel;
+  risk_level?: NivelRisco;
   created_at: string;
   updated_at: string;
 }
 
-// ─── Risk Matrix ─────────────────────────────────────────────────────────────
+// ─── Matriz de Risco ──────────────────────────────────────────────────────────
 
 export interface RiskMatrix {
   id: number;
@@ -246,17 +266,18 @@ export interface RiskItem {
   probability: 1 | 2 | 3 | 4 | 5;
   severity: 1 | 2 | 3 | 4 | 5;
   risk_score: number;
-  risk_level: RiskLevel;
+  risk_level: NivelRisco;
   description?: string;
 }
 
-// ─── Tasks (async jobs) ───────────────────────────────────────────────────────
+// ─── Tarefas assíncronas ──────────────────────────────────────────────────────
 
-export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type StatusTarefa = 'pending' | 'running' | 'completed' | 'failed';
+export type TaskStatus = StatusTarefa;
 
 export interface AsyncTask {
   id: string;
-  status: TaskStatus;
+  status: StatusTarefa;
   progress: number;
   result_url?: string;
   error?: string;
@@ -264,7 +285,7 @@ export interface AsyncTask {
   updated_at: string;
 }
 
-// ─── Notifications ───────────────────────────────────────────────────────────
+// ─── Notificações ─────────────────────────────────────────────────────────────
 
 export interface Notification {
   id: number;
@@ -276,7 +297,7 @@ export interface Notification {
   type: 'info' | 'warning' | 'success' | 'error';
 }
 
-// ─── Pagination ──────────────────────────────────────────────────────────────
+// ─── Paginação ────────────────────────────────────────────────────────────────
 
 export interface PaginatedResponse<T> {
   count: number;

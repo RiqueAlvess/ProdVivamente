@@ -11,8 +11,6 @@ from django.shortcuts import get_object_or_404
 
 from .models import SurveyInvitation
 from .serializers import SurveyInvitationSerializer
-from django.db import connection
-
 from apps.surveys.models import Campaign
 from apps.core.models import TaskQueue
 from apps.tenants.models import Empresa
@@ -23,15 +21,20 @@ logger = logging.getLogger(__name__)
 
 
 def get_user_empresa(user, empresa_id=None):
-    """Get empresa for user - raises PermissionError if not allowed."""
+    """Retorna a empresa do usuário. Lança PermissionError se não tiver acesso."""
     if user.is_staff or user.is_superuser:
         if empresa_id:
             return get_object_or_404(Empresa, pk=empresa_id)
         return None
-    tenant = connection.tenant
-    if empresa_id and str(empresa_id) != str(tenant.pk):
+    try:
+        empresa = user.profile.empresa
+    except Exception:
+        empresa = None
+    if not empresa:
+        raise PermissionError('Usuário sem empresa associada.')
+    if empresa_id and str(empresa_id) != str(empresa.pk):
         raise PermissionError('Acesso negado a esta empresa.')
-    return tenant
+    return empresa
 
 
 class ImportCSVView(APIView):
@@ -162,8 +165,8 @@ class InvitationListView(generics.ListAPIView):
         user = self.request.user
         if user.is_staff or user.is_superuser:
             qs = SurveyInvitation.objects.all()
-        elif hasattr(user, 'profile'):
-            qs = SurveyInvitation.objects.filter(empresa=connection.tenant)
+        elif hasattr(user, 'profile') and user.profile.empresa:
+            qs = SurveyInvitation.objects.filter(empresa=user.profile.empresa)
         else:
             return SurveyInvitation.objects.none()
 

@@ -3,32 +3,27 @@ import secrets
 import string
 
 from django.contrib.auth.models import User
-from django.db import connection
-from django_tenants.utils import tenant_context
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Domain, Empresa
-from .serializers import (
-    CurrentTenantSerializer,
-    DomainSerializer,
-    EmpresaPublicSerializer,
-    EmpresaSerializer,
-    TenantSetupSerializer,
-)
+from .models import Empresa
+from .serializers import EmpresaSerializer, EmpresaCreateSerializer
 
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Public-schema views (used in urls_public.py)
-# ---------------------------------------------------------------------------
+def _generate_password(length=14):
+    alphabet = string.ascii_letters + string.digits + '!@#$'
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
 
 class EmpresaListCreateView(generics.ListCreateAPIView):
-    """List and create companies (superadmin only for write). Public schema."""
+    """
+    GET  /api/empresas/ — lista empresas (superadmin vê todas; RH vê só a sua)
+    POST /api/empresas/ — cria empresa (superadmin apenas)
+    """
     serializer_class = EmpresaSerializer
-    queryset = Empresa.objects.all()
 
     def get_permissions(self):
         if self.request.method == 'POST':
@@ -36,68 +31,58 @@ class EmpresaListCreateView(generics.ListCreateAPIView):
         return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
-        if self.request.user.is_staff or self.request.user.is_superuser:
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
             return Empresa.objects.all()
-        return Empresa.objects.filter(ativo=True)
+        # Usuário comum vê apenas sua própria empresa
+        try:
+            empresa = user.profile.empresa
+            if empresa:
+                return Empresa.objects.filter(pk=empresa.pk, ativo=True)
+        except Exception:
+            pass
+        return Empresa.objects.none()
 
 
 class EmpresaDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Retrieve, update or delete a company. Public schema."""
+    """GET/PATCH/DELETE /api/empresas/<id>/"""
     serializer_class = EmpresaSerializer
-    queryset = Empresa.objects.all()
 
     def get_permissions(self):
         if self.request.method in ('PUT', 'PATCH', 'DELETE'):
             return [permissions.IsAdminUser()]
         return [permissions.IsAuthenticated()]
 
-
-class EmpresaBySlugView(APIView):
-    """Public endpoint to look up a company by slug (for branding)."""
-    permission_classes = [permissions.AllowAny]
-
-    def get(self, request, slug):
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return Empresa.objects.all()
         try:
-            empresa = Empresa.objects.get(slug=slug, ativo=True)
-            return Response(EmpresaPublicSerializer(empresa).data)
-        except Empresa.DoesNotExist:
-            return Response({'error': 'Empresa não encontrada'}, status=404)
+            empresa = user.profile.empresa
+            if empresa:
+                return Empresa.objects.filter(pk=empresa.pk)
+        except Exception:
+            pass
+        return Empresa.objects.none()
 
 
-class DomainListCreateView(generics.ListCreateAPIView):
-    """List and create domains for tenants. Admin only."""
-    serializer_class = DomainSerializer
-    permission_classes = [permissions.IsAdminUser]
-    queryset = Domain.objects.select_related('tenant').all()
-
-
-class DomainDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Retrieve, update or delete a domain. Admin only."""
-    serializer_class = DomainSerializer
-    permission_classes = [permissions.IsAdminUser]
-    queryset = Domain.objects.all()
-
-
-class TenantSetupView(APIView):
+class EmpresaSetupView(APIView):
     """
-    POST /api/tenants/setup/
+    POST /api/empresas/setup/
 
-    All-in-one endpoint (superadmin only) that:
-      1. Creates the Empresa (auto-creates PostgreSQL schema)
-      2. Creates the primary Domain
-      3. Provisions the initial RH admin user inside the new schema
-      4. Returns the credentials (shown only once)
+    Endpoint all-in-one (superadmin) que:
+      1. Cria a Empresa
+      2. Provisiona o usuário admin RH inicial
+      3. Retorna as credenciais (exibidas apenas uma vez)
     """
     permission_classes = [permissions.IsAdminUser]
 
     def post(self, request):
-        serializer = TenantSetupSerializer(data=request.data)
+        serializer = EmpresaCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        # 1. Create Empresa (TenantMixin auto-creates the PostgreSQL schema)
         empresa = Empresa.objects.create(
-            schema_name=data['schema_name'],
             nome=data['nome'],
             cnpj=data['cnpj'],
             total_funcionarios=data.get('total_funcionarios', 0),
@@ -106,44 +91,34 @@ class TenantSetupView(APIView):
             admin_email=data['admin_email'],
         )
 
-        # 2. Create primary Domain
-        domain = Domain.objects.create(
-            domain=data['domain'],
-            tenant=empresa,
-            is_primary=True,
-        )
-
-        # 3. Provision initial RH admin inside the new schema
         password = data.get('admin_password') or _generate_password()
         try:
-            with tenant_context(empresa):
-                from apps.accounts.models import UserProfile
+            from apps.accounts.models import UserProfile
 
-                base_username = data['admin_email'].split('@')[0]
-                username = base_username
-                n = 1
-                while User.objects.filter(username=username).exists():
-                    username = f'{base_username}{n}'
-                    n += 1
+            base_username = data['admin_email'].split('@')[0]
+            username = base_username
+            n = 1
+            while User.objects.filter(username=username).exists():
+                username = f'{base_username}{n}'
+                n += 1
 
-                admin_user = User.objects.create_user(
-                    username=username,
-                    email=data['admin_email'],
-                    password=password,
-                    first_name=data.get('admin_first_name', 'Admin'),
-                    last_name=data.get('admin_last_name', ''),
-                    is_staff=True,
-                    is_active=True,
-                )
-                UserProfile.objects.create(user=admin_user, role='rh')
+            admin_user = User.objects.create_user(
+                username=username,
+                email=data['admin_email'],
+                password=password,
+                first_name=data.get('admin_first_name', 'Admin'),
+                last_name=data.get('admin_last_name', ''),
+                is_staff=True,
+                is_active=True,
+            )
+            UserProfile.objects.create(user=admin_user, role='rh', empresa=empresa)
         except Exception as e:
-            logger.error('Falha ao provisionar admin para %s: %s', empresa.schema_name, e)
+            logger.error('Falha ao provisionar admin para %s: %s', empresa.nome, e)
             return Response(
                 {
                     'empresa': EmpresaSerializer(empresa).data,
-                    'domain': DomainSerializer(domain).data,
                     'admin_user': None,
-                    'warning': f'Tenant criado, mas falha ao criar usuário admin: {e}',
+                    'aviso': f'Empresa criada, mas falha ao criar usuário admin: {e}',
                 },
                 status=status.HTTP_207_MULTI_STATUS,
             )
@@ -151,37 +126,39 @@ class TenantSetupView(APIView):
         return Response(
             {
                 'empresa': EmpresaSerializer(empresa).data,
-                'domain': DomainSerializer(domain).data,
                 'admin_user': {
                     'email': admin_user.email,
                     'username': admin_user.username,
                     'password': password,
-                    'note': 'Guarde esta senha — ela não será exibida novamente.',
+                    'nota': 'Guarde esta senha — ela não será exibida novamente.',
                 },
             },
             status=status.HTTP_201_CREATED,
         )
 
 
-def _generate_password(length=14):
-    alphabet = string.ascii_letters + string.digits + '!@#$'
-    return ''.join(secrets.choice(alphabet) for _ in range(length))
-
-
-# ---------------------------------------------------------------------------
-# Tenant-schema views (used in urls.py / ROOT_URLCONF)
-# ---------------------------------------------------------------------------
-
-class CurrentTenantView(APIView):
+class MinhaEmpresaView(APIView):
     """
-    GET  /api/tenant/  — return current tenant info (from connection.tenant)
-    PATCH/PUT          — update current tenant settings (admin only)
+    GET  /api/empresas/minha/ — retorna a empresa do usuário logado
+    PATCH/PUT                  — atualiza dados da empresa (admin apenas)
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    def _get_empresa(self, user):
+        if user.is_staff or user.is_superuser:
+            empresa_id = self.request.query_params.get('empresa_id')
+            if empresa_id:
+                return Empresa.objects.filter(pk=empresa_id).first()
+        try:
+            return user.profile.empresa
+        except Exception:
+            return None
+
     def get(self, request):
-        tenant = connection.tenant
-        return Response(CurrentTenantSerializer(tenant).data)
+        empresa = self._get_empresa(request.user)
+        if not empresa:
+            return Response({'error': 'Empresa não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(EmpresaSerializer(empresa).data)
 
     def patch(self, request):
         return self._update(request, partial=True)
@@ -192,8 +169,10 @@ class CurrentTenantView(APIView):
     def _update(self, request, partial):
         if not (request.user.is_staff or request.user.is_superuser):
             return Response({'error': 'Permissão negada'}, status=status.HTTP_403_FORBIDDEN)
-        tenant = connection.tenant
-        serializer = CurrentTenantSerializer(tenant, data=request.data, partial=partial)
+        empresa = self._get_empresa(request.user)
+        if not empresa:
+            return Response({'error': 'Empresa não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = EmpresaSerializer(empresa, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
