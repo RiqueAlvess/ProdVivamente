@@ -20,6 +20,7 @@ export interface UserProfile {
   empresa?: number;
   empresa_nome?: string;
   telefone?: string;
+  setores_permitidos?: number[];
   created_at: string;
 }
 
