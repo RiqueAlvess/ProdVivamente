@@ -25,34 +25,45 @@ class Migration(migrations.Migration):
             sql="""
             DO $$
             BEGIN
-                -- user + created_at index
-                IF NOT EXISTS (
-                    SELECT 1 FROM pg_indexes
+                -- Guard: only create indexes if the table already exists.
+                -- The table may be absent when django_migrations shows 0001 as
+                -- applied (from a prior partial run) but the DB was subsequently
+                -- reset.  In that case this migration is a safe no-op; 0001 will
+                -- recreate the table (and its indexes) when the DB is fully reset.
+                IF EXISTS (
+                    SELECT 1 FROM pg_tables
                     WHERE schemaname = current_schema()
-                      AND indexname = 'accounts_au_user_id_idx'
+                      AND tablename = 'accounts_auditlog'
                 ) THEN
-                    CREATE INDEX accounts_au_user_id_idx
-                        ON accounts_auditlog (user_id, created_at);
-                END IF;
+                    -- user + created_at index
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_indexes
+                        WHERE schemaname = current_schema()
+                          AND indexname = 'accounts_au_user_id_idx'
+                    ) THEN
+                        CREATE INDEX accounts_au_user_id_idx
+                            ON accounts_auditlog (user_id, created_at);
+                    END IF;
 
-                -- empresa + created_at index
-                IF NOT EXISTS (
-                    SELECT 1 FROM pg_indexes
-                    WHERE schemaname = current_schema()
-                      AND indexname = 'accounts_au_empresa_idx'
-                ) THEN
-                    CREATE INDEX accounts_au_empresa_idx
-                        ON accounts_auditlog (empresa_id, created_at);
-                END IF;
+                    -- empresa + created_at index
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_indexes
+                        WHERE schemaname = current_schema()
+                          AND indexname = 'accounts_au_empresa_idx'
+                    ) THEN
+                        CREATE INDEX accounts_au_empresa_idx
+                            ON accounts_auditlog (empresa_id, created_at);
+                    END IF;
 
-                -- acao + created_at index
-                IF NOT EXISTS (
-                    SELECT 1 FROM pg_indexes
-                    WHERE schemaname = current_schema()
-                      AND indexname = 'accounts_au_acao_idx'
-                ) THEN
-                    CREATE INDEX accounts_au_acao_idx
-                        ON accounts_auditlog (acao, created_at);
+                    -- acao + created_at index
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_indexes
+                        WHERE schemaname = current_schema()
+                          AND indexname = 'accounts_au_acao_idx'
+                    ) THEN
+                        CREATE INDEX accounts_au_acao_idx
+                            ON accounts_auditlog (acao, created_at);
+                    END IF;
                 END IF;
             END
             $$;
