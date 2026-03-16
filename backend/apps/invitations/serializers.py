@@ -3,35 +3,33 @@ from .models import SurveyInvitation
 
 
 class SurveyInvitationSerializer(serializers.ModelSerializer):
-    """Serializer that decrypts PII fields for internal use."""
-    email = serializers.SerializerMethodField()
-    nome = serializers.SerializerMethodField()
+    """
+    LGPD-compliant serializer: exposes email_hash instead of actual email.
+    The actual email is NEVER sent to the frontend.
+    """
+    email_display = serializers.SerializerMethodField()
+    unidade_nome = serializers.CharField(source='unidade.nome', read_only=True)
+    setor_nome = serializers.CharField(source='setor.nome', read_only=True)
+    cargo_nome = serializers.CharField(source='cargo.nome', read_only=True, default=None)
     is_valid = serializers.ReadOnlyField()
-    survey_url = serializers.ReadOnlyField()
 
     class Meta:
         model = SurveyInvitation
         fields = [
-            'id', 'hash_token', 'email', 'nome',
-            'empresa', 'campaign', 'unidade', 'setor', 'cargo',
-            'status', 'expires_at', 'sent_at', 'used_at', 'is_valid', 'survey_url',
+            'id', 'hash_token', 'email_hash', 'email_display',
+            'empresa', 'campaign', 'unidade', 'unidade_nome', 'setor', 'setor_nome',
+            'cargo', 'cargo_nome',
+            'status', 'expires_at', 'sent_at', 'used_at', 'is_valid',
             'created_at',
         ]
-        read_only_fields = ['id', 'hash_token', 'created_at']
+        read_only_fields = ['id', 'hash_token', 'email_hash', 'created_at']
 
-    def get_email(self, obj):
-        try:
-            from services.crypto_service import crypto_service
-            return crypto_service.decrypt(obj.email_encrypted)
-        except Exception:
-            return '***'
-
-    def get_nome(self, obj):
-        try:
-            from services.crypto_service import crypto_service
-            return crypto_service.decrypt(obj.nome_encrypted)
-        except Exception:
-            return '***'
+    def get_email_display(self, obj):
+        """Return anonymized display: first 16 chars of HMAC-SHA256 hash."""
+        if obj.email_hash:
+            return obj.email_hash
+        # Fallback: compute from hash_token prefix for existing records without hash
+        return str(obj.hash_token)[:16]
 
 
 class SurveyInvitationAnonymousSerializer(serializers.ModelSerializer):

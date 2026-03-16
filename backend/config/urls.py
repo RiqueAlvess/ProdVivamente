@@ -13,6 +13,7 @@ urlpatterns = [
         path('tenant/', include('apps.tenants.urls')),        # current tenant info
         path('structure/', include('apps.structure.urls')),
         path('surveys/', include('apps.surveys.urls')),
+        path('campaigns/', include('apps.surveys.urls')),    # alias for frontend compatibility
         path('invitations/', include('apps.invitations.urls')),
         path('responses/', include('apps.responses.urls')),
         path('actions/', include('apps.actions.urls')),

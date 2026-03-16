@@ -17,6 +17,7 @@ class SurveyInvitation(models.Model):
 
     hash_token = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
     email_encrypted = models.TextField()   # AES-256-GCM encrypted
+    email_hash = models.CharField(max_length=64, blank=True, db_index=True)  # HMAC-SHA256 display hash (LGPD)
     nome_encrypted = models.TextField()    # AES-256-GCM encrypted
     empresa = models.ForeignKey('tenants.Empresa', on_delete=models.CASCADE, related_name='invitations')
     campaign = models.ForeignKey(
