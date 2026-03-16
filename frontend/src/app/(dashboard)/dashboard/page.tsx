@@ -24,7 +24,7 @@ export default function DashboardPage() {
   const { data: campaignsData, isLoading: loadingCampaigns } = useCampaigns();
   const { data: metrics, isLoading: loadingMetrics } = useDashboard(selectedCampaign, selectedSector);
 
-  const isLeadership = user?.role === 'leadership';
+  const isLideranca = user?.role === 'lideranca';
 
   return (
     <div>
@@ -46,14 +46,14 @@ export default function DashboardPage() {
               </SelectContent>
             </Select>
           </div>
-          {isLeadership && user?.sector && (
+          {isLideranca && user?.profile?.setores_permitidos && (
             <div className="min-w-[200px]">
               <Select onValueChange={setSelectedSector}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar setor" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={String(user.sector)}>Meu setor</SelectItem>
+                  <SelectItem value="meu-setor">Meu setor</SelectItem>
                 </SelectContent>
               </Select>
             </div>

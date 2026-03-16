@@ -1,6 +1,6 @@
 """
-Accounts views - JWT auth only. NO registration endpoint.
-Admin creates users via Django admin.
+Accounts views - autenticação JWT.
+Sem endpoint de registro — apenas admin cria usuários.
 """
 import logging
 
@@ -10,11 +10,11 @@ from django.utils.decorators import method_decorator
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .models import AuditLog
+from .models import AuditLog, UserProfile
 from .serializers import (
     CustomTokenObtainPairSerializer,
     UserSerializer,
@@ -37,12 +37,19 @@ def get_user_agent(request):
     return request.META.get('HTTP_USER_AGENT', '')[:500]
 
 
+def _get_empresa_do_usuario(user):
+    """Retorna a Empresa do usuário logado, ou None."""
+    try:
+        return user.profile.empresa
+    except Exception:
+        return None
+
+
 @method_decorator(ratelimit(key='ip', rate='3/m', method='POST', block=True), name='post')
 class CustomTokenObtainPairView(TokenObtainPairView):
     """
     POST /api/auth/token/
-    Rate limited: 3 requests/minute per IP.
-    Logs successful and failed login attempts.
+    Rate limitado: 3 requisições/minuto por IP.
     """
     serializer_class = CustomTokenObtainPairSerializer
 
@@ -52,26 +59,25 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             serializer.is_valid(raise_exception=True)
         except Exception:
             logger.warning(
-                'Failed login attempt for email=%s from IP=%s',
+                'Tentativa de login falhou para email=%s do IP=%s',
                 request.data.get('email', ''),
                 get_client_ip(request),
             )
             raise
 
         user = serializer.user
-        ip = get_client_ip(request)
-        ua = get_user_agent(request)
+        empresa = _get_empresa_do_usuario(user)
 
         try:
             AuditLog.objects.create(
                 user=user,
+                empresa=empresa,
                 acao='login',
                 descricao=f'Login via JWT - {user.username}',
-                ip=ip,
-                user_agent=ua,
+                ip=get_client_ip(request),
+                user_agent=get_user_agent(request),
             )
         except Exception:
-            # AuditLog table only exists in tenant schemas, not in the public schema
             pass
 
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
@@ -84,10 +90,7 @@ class CustomTokenRefreshView(TokenRefreshView):
 
 
 class LogoutView(APIView):
-    """
-    POST /api/auth/logout/
-    Blacklists the refresh token.
-    """
+    """POST /api/auth/logout/ — invalida o refresh token."""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
@@ -105,10 +108,12 @@ class LogoutView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         user = request.user
+        empresa = _get_empresa_do_usuario(user)
 
         try:
             AuditLog.objects.create(
                 user=user,
+                empresa=empresa,
                 acao='logout',
                 descricao=f'Logout - {user.username}',
                 ip=get_client_ip(request),
@@ -122,8 +127,8 @@ class LogoutView(APIView):
 
 class MeView(generics.RetrieveUpdateAPIView):
     """
-    GET /api/auth/me/ - Get current user info with profile
-    PATCH /api/auth/me/ - Update basic profile info
+    GET   /api/auth/me/ — dados do usuário logado
+    PATCH /api/auth/me/ — atualiza dados básicos do perfil
     """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = UserSerializer
@@ -131,11 +136,7 @@ class MeView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         return self.request.user
 
-    def get_serializer_class(self):
-        return UserSerializer
-
     def update(self, request, *args, **kwargs):
-        # Only allow updating safe fields
         allowed_fields = {'first_name', 'last_name'}
         data = {k: v for k, v in request.data.items() if k in allowed_fields}
         partial = kwargs.pop('partial', False)
@@ -168,12 +169,18 @@ class ChangePasswordView(APIView):
 
 
 class AuditLogListView(generics.ListAPIView):
-    """GET /api/auth/audit-log/ - Admin only"""
+    """GET /api/auth/audit-log/ — apenas admin"""
     serializer_class = AuditLogSerializer
     permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
+        user = self.request.user
         qs = AuditLog.objects.select_related('user').all()
+        # Admin comum vê apenas logs da sua empresa
+        if not user.is_superuser:
+            empresa = _get_empresa_do_usuario(user)
+            if empresa:
+                qs = qs.filter(empresa=empresa)
         acao = self.request.query_params.get('acao')
         if acao:
             qs = qs.filter(acao=acao)
@@ -182,21 +189,32 @@ class AuditLogListView(generics.ListAPIView):
 
 class UserListCreateView(generics.ListCreateAPIView):
     """
-    GET  /api/auth/users/  — List all users in the tenant (admin only)
-    POST /api/auth/users/  — Create a new user in the tenant (admin only)
+    GET  /api/auth/users/ — lista usuários da empresa (admin apenas)
+    POST /api/auth/users/ — cria usuário na empresa (admin apenas)
     """
     permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
-        return User.objects.select_related('profile').filter(is_superuser=False).order_by('email')
+        user = self.request.user
+        qs = User.objects.select_related('profile').filter(is_superuser=False).order_by('email')
+        if not user.is_superuser:
+            empresa = _get_empresa_do_usuario(user)
+            if empresa:
+                qs = qs.filter(profile__empresa=empresa)
+        return qs
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
             return CreateUserSerializer
         return UserSerializer
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['empresa'] = _get_empresa_do_usuario(self.request.user)
+        return ctx
+
     def create(self, request, *args, **kwargs):
-        serializer = CreateUserSerializer(data=request.data)
+        serializer = CreateUserSerializer(data=request.data, context=self.get_serializer_context())
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
@@ -204,15 +222,21 @@ class UserListCreateView(generics.ListCreateAPIView):
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
-    GET    /api/auth/users/<id>/  — Get user detail
-    PATCH  /api/auth/users/<id>/  — Update user info
-    DELETE /api/auth/users/<id>/  — Deactivate user (soft delete)
+    GET    /api/auth/users/<id>/ — detalhe do usuário
+    PATCH  /api/auth/users/<id>/ — atualiza dados
+    DELETE /api/auth/users/<id>/ — desativa usuário (soft delete)
     """
     permission_classes = [permissions.IsAdminUser]
     serializer_class = UserSerializer
 
     def get_queryset(self):
-        return User.objects.select_related('profile').filter(is_superuser=False)
+        user = self.request.user
+        qs = User.objects.select_related('profile').filter(is_superuser=False)
+        if not user.is_superuser:
+            empresa = _get_empresa_do_usuario(user)
+            if empresa:
+                qs = qs.filter(profile__empresa=empresa)
+        return qs
 
     def perform_destroy(self, instance):
         instance.is_active = False

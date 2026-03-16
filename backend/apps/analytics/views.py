@@ -15,8 +15,6 @@ from .serializers import SectorAnalysisSerializer
 from apps.surveys.models import Campaign
 from apps.surveys.serializers import CampaignSerializer
 from apps.structure.serializers import SetorSerializer
-from django.db import connection
-
 from apps.tenants.models import Empresa
 from apps.core.models import TaskQueue
 from services.audit_service import AuditService
@@ -27,7 +25,13 @@ logger = logging.getLogger(__name__)
 def get_user_empresas(user):
     if user.is_staff or user.is_superuser:
         return Empresa.objects.filter(ativo=True)
-    return Empresa.objects.filter(pk=connection.tenant.pk, ativo=True)
+    try:
+        empresa = user.profile.empresa
+        if empresa and empresa.ativo:
+            return Empresa.objects.filter(pk=empresa.pk)
+    except Exception:
+        pass
+    return Empresa.objects.none()
 
 
 def get_campaign_for_user(user, campaign_id):

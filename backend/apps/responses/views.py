@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
-from django.db import connection
+
 
 from .models import SurveyResponse
 from .serializers import (
@@ -259,9 +259,9 @@ class ResponseListView(APIView):
         user = request.user
         if user.is_staff or user.is_superuser:
             qs = SurveyResponse.objects.all()
-        elif hasattr(user, 'profile'):
+        elif hasattr(user, 'profile') and user.profile.empresa:
             qs = SurveyResponse.objects.filter(
-                campaign__empresa=connection.tenant
+                campaign__empresa=user.profile.empresa
             )
         else:
             return Response([], status=status.HTTP_200_OK)

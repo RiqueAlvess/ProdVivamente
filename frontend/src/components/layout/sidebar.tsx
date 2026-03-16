@@ -15,9 +15,9 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Painel', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Campanhas', href: '/campaigns', icon: Megaphone },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'Análises', href: '/analytics', icon: BarChart3 },
   { name: 'Configurações', href: '/settings', icon: Settings },
 ];
 

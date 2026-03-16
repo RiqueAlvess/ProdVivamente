@@ -1,7 +1,7 @@
 """
-Accounts app models - UserProfile and AuditLog.
-NO registration endpoint - only admin creates users via Django admin.
-With django-tenants, UserProfile is schema-isolated per tenant.
+Accounts app models - UserProfile e AuditLog.
+Sem registro público — apenas admin cria usuários via Django admin.
+Isolamento por empresa: cada UserProfile pertence a uma Empresa.
 """
 from django.contrib.auth.models import User
 from django.db import models
@@ -14,8 +14,15 @@ class UserProfile(models.Model):
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    empresa = models.ForeignKey(
+        'tenants.Empresa',
+        on_delete=models.CASCADE,
+        related_name='usuarios',
+        null=True,
+        blank=True,
+        verbose_name='Empresa',
+    )
     role = models.CharField(max_length=20, choices=ROLES, default='rh')
-    # No empresa FK — isolation is done by PostgreSQL schema (django-tenants)
     unidades_permitidas = models.ManyToManyField('structure.Unidade', blank=True)
     setores_permitidos = models.ManyToManyField('structure.Setor', blank=True)
     telefone = models.CharField(max_length=20, blank=True)
@@ -26,7 +33,8 @@ class UserProfile(models.Model):
         verbose_name_plural = 'Perfis de Usuários'
 
     def __str__(self):
-        return f'{self.user.username} ({self.get_role_display()})'
+        empresa_nome = self.empresa.nome if self.empresa else 'Sem empresa'
+        return f'{self.user.username} ({self.get_role_display()}) — {empresa_nome}'
 
 
 class AuditLog(models.Model):
@@ -44,7 +52,13 @@ class AuditLog(models.Model):
     ]
 
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    # No empresa FK — audit is per-schema (tenant-scoped)
+    empresa = models.ForeignKey(
+        'tenants.Empresa',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Empresa',
+    )
     acao = models.CharField(max_length=50, choices=ACOES)
     descricao = models.TextField()
     ip = models.GenericIPAddressField(null=True, blank=True)
@@ -57,6 +71,7 @@ class AuditLog(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['user', 'created_at']),
+            models.Index(fields=['empresa', 'created_at']),
             models.Index(fields=['acao', 'created_at']),
         ]
 

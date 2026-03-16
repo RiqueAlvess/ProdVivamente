@@ -1,6 +1,7 @@
 """
 VIVAMENTE 360º - Base Settings
 Django 5.x + DRF + Clean Architecture
+Sem multi-tenancy: isolamento de dados por empresa (grupo).
 """
 import os
 from datetime import timedelta
@@ -22,13 +23,10 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # ---------------------------------------------------------------------------
-# Application definition — django-tenants schema-per-tenant
+# Application definition
 # ---------------------------------------------------------------------------
-
-# SHARED_APPS: live in the public schema (shared by all tenants)
-SHARED_APPS = [
-    'django_tenants',           # must be first
-    'apps.tenants',             # Empresa (TenantMixin) + Domain (DomainMixin)
+INSTALLED_APPS = [
+    'apps.tenants',             # Empresa (grupo de acesso)
 
     'django.contrib.contenttypes',
     'django.contrib.auth',
@@ -43,10 +41,7 @@ SHARED_APPS = [
     'drf_spectacular',
     'corsheaders',
     'django_celery_beat',
-]
 
-# TENANT_APPS: each tenant gets its own PostgreSQL schema with these tables
-TENANT_APPS = [
     'apps.accounts',
     'apps.structure',
     'apps.surveys',
@@ -57,19 +52,8 @@ TENANT_APPS = [
     'apps.core',
 ]
 
-INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
-
-# django-tenants model references
-TENANT_MODEL = 'tenants.Empresa'
-TENANT_DOMAIN_MODEL = 'tenants.Domain'
-
-# Public schema URL conf (tenant management + admin)
-PUBLIC_SCHEMA_URLCONF = 'config.urls_public'
-
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # must be before TenantMainMiddleware to handle preflight
-    'django_tenants.middleware.main.TenantMainMiddleware',
-    'config.tenant_middleware.TenantFromHeaderMiddleware',  # X-Tenant-Schema header fallback
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -101,7 +85,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # ---------------------------------------------------------------------------
-# Database - Supabase PostgreSQL via psycopg2
+# Database - PostgreSQL via psycopg2
 # ---------------------------------------------------------------------------
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
@@ -115,7 +99,7 @@ if DATABASE_URL:
         db_params = match.groupdict()
         DATABASES = {
             'default': {
-                'ENGINE': 'django_tenants.postgresql_backend',  # required by django-tenants
+                'ENGINE': 'django.db.backends.postgresql',
                 'NAME': db_params['name'],
                 'USER': db_params['user'],
                 'PASSWORD': db_params['password'],
@@ -135,7 +119,7 @@ if DATABASE_URL:
 else:
     DATABASES = {
         'default': {
-            'ENGINE': 'django_tenants.postgresql_backend',  # required by django-tenants
+            'ENGINE': 'django.db.backends.postgresql',
             'NAME': os.environ.get('DB_NAME', 'vivamente'),
             'USER': os.environ.get('DB_USER', 'postgres'),
             'PASSWORD': os.environ.get('DB_PASSWORD', ''),
@@ -143,8 +127,6 @@ else:
             'PORT': os.environ.get('DB_PORT', '5432'),
         }
     }
-
-DATABASE_ROUTERS = ['django_tenants.routers.TenantSyncRouter']
 
 # ---------------------------------------------------------------------------
 # Password validation
@@ -223,7 +205,7 @@ SIMPLE_JWT = {
 # ---------------------------------------------------------------------------
 SPECTACULAR_SETTINGS = {
     'TITLE': 'VIVAMENTE 360º API',
-    'DESCRIPTION': 'Backend API for psychosocial risk assessment platform',
+    'DESCRIPTION': 'API da plataforma de avaliação de riscos psicossociais',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,

@@ -1,5 +1,5 @@
 """
-Audit logging service.
+Serviço de auditoria.
 """
 import logging
 
@@ -7,15 +7,11 @@ logger = logging.getLogger(__name__)
 
 
 class AuditService:
-    """Centralized audit logging."""
+    """Log centralizado de auditoria."""
 
     @staticmethod
     def log(user, empresa, acao: str, descricao: str, request=None) -> None:
-        """
-        Create an audit log entry.
-        Tenant isolation is handled by django-tenants (schema-based).
-        The empresa parameter is accepted for call-site compatibility but not stored.
-        """
+        """Registra uma entrada no log de auditoria."""
         from apps.accounts.models import AuditLog
 
         ip = None
@@ -32,10 +28,11 @@ class AuditService:
         try:
             AuditLog.objects.create(
                 user=user,
+                empresa=empresa,
                 acao=acao,
                 descricao=descricao,
                 ip=ip,
                 user_agent=ua,
             )
         except Exception as e:
-            logger.error('Failed to create audit log: %s', e)
+            logger.error('Falha ao criar log de auditoria: %s', e)

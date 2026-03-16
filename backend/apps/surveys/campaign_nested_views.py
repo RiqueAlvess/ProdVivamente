@@ -19,7 +19,6 @@ Field name translation: backend Portuguese → frontend English.
 import logging
 import os
 
-from django.db import connection
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -42,19 +41,18 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _get_tenant_empresa(user):
-    """Return the Empresa for the current tenant schema."""
-    if user.is_staff or user.is_superuser:
-        return None  # Staff can access any campaign
-    return connection.tenant
-
-
 def _get_campaign(pk, user):
-    """Fetch a campaign, restricting to the current tenant."""
-    empresa = _get_tenant_empresa(user)
-    if empresa:
-        return get_object_or_404(Campaign, pk=pk, empresa=empresa)
-    return get_object_or_404(Campaign, pk=pk)
+    """Retorna a campanha, restringindo ao grupo (empresa) do usuário."""
+    if user.is_staff or user.is_superuser:
+        return get_object_or_404(Campaign, pk=pk)
+    try:
+        empresa = user.profile.empresa
+        if empresa:
+            return get_object_or_404(Campaign, pk=pk, empresa=empresa)
+    except Exception:
+        pass
+    from rest_framework.exceptions import PermissionDenied
+    raise PermissionDenied('Acesso negado.')
 
 
 def _serialize_invitation(inv):
